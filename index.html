@@ -1,1 +1,779 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>JurnieGo — Find the Squishies!</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: linear-gradient(180deg, #ffe9f3 0%, #fff6ec 100%);
+    font: 16px system-ui, -apple-system, sans-serif;
+    color: #4a2b3a; overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  #wrap { position: relative; width: 100vw; height: 100dvh; display: flex; align-items: center; justify-content: center; }
+  #game { display: block; background: #fdf3e3; box-shadow: 0 10px 40px rgba(150, 60, 110, .25); border-radius: 10px; }
+  #hud {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center; z-index: 5; pointer-events: none;
+    width: max-content; max-width: 96vw; flex-wrap: wrap; justify-content: center;
+  }
+  .pill {
+    background: rgba(255,255,255,.92); border: 2px solid #f3b8d2; border-radius: 999px;
+    padding: 5px 14px; font-weight: 700; font-size: 15px; box-shadow: 0 2px 8px rgba(150,60,110,.15);
+  }
+  .pill b { color: #d63384; }
+  #hud button {
+    pointer-events: auto; border: 2px solid #f3b8d2; background: rgba(255,255,255,.92);
+    border-radius: 999px; font-size: 17px; padding: 4px 12px; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(150,60,110,.15);
+  }
+  #roomToast {
+    position: absolute; top: 58px; left: 50%; transform: translateX(-50%);
+    background: rgba(74,43,58,.85); color: #ffe9f3; padding: 5px 18px; border-radius: 999px;
+    font-weight: 700; font-size: 15px; opacity: 0; transition: opacity .35s; z-index: 5; pointer-events: none;
+  }
+  #talkBtn {
+    position: absolute; right: 18px; bottom: 20px; z-index: 6;
+    width: 74px; height: 74px; border-radius: 50%; font-size: 32px;
+    border: 3px solid #f3b8d2; background: rgba(255,255,255,.94); cursor: pointer;
+    box-shadow: 0 4px 14px rgba(150,60,110,.3); display: none;
+  }
+  #talkBtn.ready { display: block; animation: bob 1s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  #joy {
+    position: absolute; left: 18px; bottom: 20px; width: 96px; height: 96px; z-index: 6; display: none;
+  }
+  #joyBase {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: rgba(255,255,255,.35); border: 2px solid rgba(214,51,132,.45);
+  }
+  #joyKnob {
+    position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,.9); border: 2px solid #f3b8d2; transform: translate(-50%,-50%);
+    box-shadow: 0 2px 8px rgba(150,60,110,.3);
+  }
+  #start {
+    position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 20px;
+    background: radial-gradient(ellipse at center, rgba(255,233,243,.88), rgba(255,214,232,.96));
+  }
+  #start h1 { font-size: clamp(38px, 8vw, 64px); color: #d63384; letter-spacing: 1px; text-shadow: 0 3px 0 #fff; }
+  #start p { font-size: clamp(15px, 3.4vw, 19px); max-width: 520px; line-height: 1.45; }
+  #playBtn {
+    font-size: 24px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ff7eb6, #e7549c);
+    border: none; border-radius: 999px; padding: 14px 44px; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(214,51,132,.4);
+  }
+  #playBtn:active { transform: scale(.96); }
+  .hint { font-size: 13.5px; color: #8a5570; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="640"></canvas>
+
+  <div id="hud">
+    <div class="pill">🧸 Squishies <b id="sqCount">0/10</b></div>
+    <div class="pill">🫧 NeeDoh <b id="ndCount">0/8</b></div>
+    <button id="soundBtn" title="Talking voices on/off">🔊</button>
+  </div>
+  <div id="roomToast"></div>
+  <button id="talkBtn" title="Talk">💬</button>
+  <div id="joy"><div id="joyBase"></div><div id="joyKnob"></div></div>
+
+  <div id="start">
+    <h1>🌈 JurnieGo 🌈</h1>
+    <p>Help <b>Jurnie</b> explore the cozy house with her sister <b>Leah</b> and their cat <b>Fancy</b>!<br>
+    Squishies and NeeDohs are hiding in every room — can you find them all?</p>
+    <button id="playBtn">▶ Play</button>
+    <p class="hint">Move: WASD / arrow keys, or the joystick on touch screens<br>
+    Walk up to Leah or Fancy and press <b>E</b> (or tap 💬) to talk to them!</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const W = 960, H = 640;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function fitCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  canvas.style.width = (W * s) + 'px'; canvas.style.height = (H * s) + 'px';
+}
+window.addEventListener('resize', fitCanvas); fitCanvas();
+
+// ---------- input ----------
+const keys = {};
+let joyVec = { x: 0, y: 0 }, joyActive = false, joyId = null, joyCenter = { x: 0, y: 0 };
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
+  if (e.key.toLowerCase() === 'e') tryInteract();
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+const joy = document.getElementById('joy'), joyKnob = document.getElementById('joyKnob');
+function isTouch() { return 'ontouchstart' in window || navigator.maxTouchPoints > 0; }
+if (isTouch()) joy.style.display = 'block';
+function joyStart(t) {
+  const r = joy.getBoundingClientRect();
+  joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  joyActive = true; joyId = t.identifier; joyMove(t);
+}
+function joyMove(t) {
+  if (!joyActive || t.identifier !== joyId) return;
+  let dx = t.clientX - joyCenter.x, dy = t.clientY - joyCenter.y;
+  const m = Math.hypot(dx, dy), max = 34;
+  if (m > max) { dx = dx / m * max; dy = dy / m * max; }
+  joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  joyVec = { x: dx / max, y: dy / max };
+}
+function joyEnd(t) {
+  if (t.identifier !== joyId) return;
+  joyActive = false; joyVec = { x: 0, y: 0 };
+  joyKnob.style.transform = 'translate(-50%,-50%)';
+}
+joy.addEventListener('touchstart', e => { e.preventDefault(); joyStart(e.changedTouches[0]); }, { passive: false });
+window.addEventListener('touchmove', e => { if (joyActive) { e.preventDefault(); joyMove(e.changedTouches[0]); } }, { passive: false });
+window.addEventListener('touchend', e => { for (const t of e.changedTouches) joyEnd(t); });
+window.addEventListener('touchcancel', e => { for (const t of e.changedTouches) joyEnd(t); });
+document.getElementById('talkBtn').addEventListener('click', tryInteract);
+
+// ---------- audio: little sounds + talking ----------
+let audioCtx = null, talkOn = true, started = false;
+function beep(freq, dur = 0.12, type = 'sine', vol = 0.15, when = 0) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime + when;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+}
+function popSound() { beep(520, .09, 'sine', .18); beep(780, .12, 'sine', .15, .06); }
+function sparkleSound() { [880, 1174, 1568].forEach((f, i) => beep(f, .1, 'triangle', .12, i * .05)); }
+function meowSound() { beep(620, .16, 'sawtooth', .05); beep(440, .2, 'sawtooth', .05, .13); }
+function speak(text, pitch) {
+  if (!talkOn || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = pitch; u.rate = 1.02; u.lang = 'en-US';
+    speechSynthesis.speak(u);
+  } catch (e) { /* voices unavailable — bubbles still show */ }
+}
+const soundBtn = document.getElementById('soundBtn');
+soundBtn.addEventListener('click', () => {
+  talkOn = !talkOn;
+  soundBtn.textContent = talkOn ? '🔊' : '🔇';
+  if (!talkOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+});
+document.getElementById('playBtn').addEventListener('click', () => {
+  document.getElementById('start').style.display = 'none';
+  started = true;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+  showBubble(jurnie, "Let's find the squishies!", 2600);
+  speak("Let's find the squishies!", 1.45);
+});
+
+// ---------- the cozy house: 3 x 3 rooms ----------
+const RW = 320, RH = 213.33;
+const roomNames = [
+  "Jurnie's Room", "Leah's Room", "Kitchen",
+  "Living Room", "Play Room", "Bathroom",
+  "Story Corner", "Garden Room", "Toy Room"
+];
+const roomFloors = ['#ffe3ee', '#e9e2ff', '#fff3d6', '#ffeedd', '#e2f6ff', '#dff5f0', '#fdeeda', '#e4f9e0', '#ffe9f6'];
+function roomAt(x, y) {
+  const c = Math.max(0, Math.min(2, Math.floor(x / RW)));
+  const r = Math.max(0, Math.min(2, Math.floor(y / RH)));
+  return r * 3 + c;
+}
+
+// walls: outer border + inner dividers with door gaps
+const walls = [];
+(function buildWalls() {
+  const T = 12; // outer thickness
+  walls.push({ x: 0, y: 0, w: W, h: T }, { x: 0, y: H - T, w: W, h: T },
+             { x: 0, y: 0, w: T, h: H }, { x: W - T, y: 0, w: T, h: H });
+  const gap = 84;
+  // vertical dividers at x=320 and x=640, one door per room row
+  for (const dx of [320, 640]) {
+    for (let r = 0; r < 3; r++) {
+      const y0 = r * RH, y1 = (r + 1) * RH, gc = y0 + RH / 2;
+      walls.push({ x: dx - 5, y: y0, w: 10, h: gc - gap / 2 - y0 });
+      walls.push({ x: dx - 5, y: gc + gap / 2, w: 10, h: y1 - (gc + gap / 2) });
+    }
+  }
+  // horizontal dividers at y=213.33 and y=426.67, one door per room column
+  for (const dy of [RH, RH * 2]) {
+    for (let c = 0; c < 3; c++) {
+      const x0 = c * RW, x1 = (c + 1) * RW, gc = x0 + RW / 2;
+      walls.push({ x: x0, y: dy - 5, w: gc - gap / 2 - x0, h: 10 });
+      walls.push({ x: gc + gap / 2, y: dy - 5, w: x1 - (gc + gap / 2), h: 10 });
+    }
+  }
+})();
+
+// furniture blockers (soft obstacles) per room
+const blockers = [
+  { x: 30, y: 26, w: 110, h: 64 },    // Jurnie's bed
+  { x: 350, y: 26, w: 110, h: 64 },   // Leah's bed
+  { x: 566, y: 24, w: 56, h: 92 },    // bookshelf (Leah's room)
+  { x: 664, y: 22, w: 272, h: 40 },   // kitchen counter
+  { x: 748, y: 108, w: 96, h: 62 },   // kitchen table
+  { x: 34, y: 300, w: 128, h: 56 },   // sofa
+  { x: 226, y: 238, w: 66, h: 34 },   // TV stand
+  { x: 660, y: 452, w: 58, h: 96 },   // toy shelf
+  { x: 740, y: 300, w: 150, h: 74 },  // bathtub
+  { x: 36, y: 452, w: 170, h: 44 },   // story shelves
+  { x: 440, y: 452, w: 120, h: 60 },  // garden planter
+];
+function collide(px, py, r) {
+  for (const wl of walls.concat(blockers)) {
+    const nx = Math.max(wl.x, Math.min(px, wl.x + wl.w));
+    const ny = Math.max(wl.y, Math.min(py, wl.y + wl.h));
+    const dx = px - nx, dy = py - ny;
+    if (dx * dx + dy * dy < r * r) return true;
+  }
+  return false;
+}
+function moveActor(a, dx, dy, r) {
+  if (!collide(a.x + dx, a.y, r)) a.x += dx;
+  if (!collide(a.x, a.y + dy, r)) a.y += dy;
+}
+
+// ---------- hide the squishies & NeeDohs ----------
+// squishy shapes: star, heart, bear, cloud, bunny — soft toys that squash a little
+// needoh: glossy squeeze balls
+const squishies = [
+  { x: 268, y: 60,  shape: 'star',  color: '#ffd93d', found: false },
+  { x: 512, y: 168, shape: 'heart', color: '#ff8fab', found: false },
+  { x: 906, y: 190, shape: 'bear',  color: '#c3a6ff', found: false },
+  { x: 60,  y: 402, shape: 'cloud', color: '#aee7ff', found: false },
+  { x: 470, y: 300, shape: 'bunny', color: '#ffb3d9', found: false },
+  { x: 906, y: 330, shape: 'star',  color: '#9bf6a3', found: false },
+  { x: 120, y: 596, shape: 'heart', color: '#ffc59e', found: false },
+  { x: 420, y: 590, shape: 'bear',  color: '#8fd8ff', found: false },
+  { x: 250, y: 500, shape: 'cloud', color: '#ffe29e', found: false },
+  { x: 596, y: 596, shape: 'bunny', color: '#d0a2ff', found: false },
+];
+const needohs = [
+  { x: 180, y: 130, color: '#ff5d8f', found: false },
+  { x: 600, y: 60,  color: '#4dc3ff', found: false },
+  { x: 690, y: 190, color: '#ffb340', found: false },
+  { x: 290, y: 330, color: '#7be495', found: false },
+  { x: 540, y: 400, color: '#b98cff', found: false },
+  { x: 880, y: 440, color: '#ff7a59', found: false },
+  { x: 300, y: 440, color: '#4dd8d0', found: false },
+  { x: 906, y: 590, color: '#ffd93d', found: false },
+];
+let sqFound = 0, ndFound = 0, won = false;
+
+// ---------- drawing helpers ----------
+function rr(x, y, w, h, r) { // rounded rect path
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function drawHouse() {
+  // floors
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    ctx.fillStyle = roomFloors[r * 3 + c];
+    ctx.fillRect(c * RW, r * RH, RW, RH);
+  }
+  // rugs
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  rr(88, 118, 150, 66, 30); ctx.fill();
+  rr(70, 372, 170, 60, 30); ctx.fill();
+  rr(700, 500, 200, 90, 26); ctx.fill();
+  // walls
+  ctx.fillStyle = '#b08968';
+  for (const wl of walls) ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  for (const wl of walls) if (wl.h <= 12) ctx.fillRect(wl.x, wl.y, wl.w, 3);
+  // room labels
+  ctx.fillStyle = 'rgba(120,70,95,.55)';
+  ctx.font = '700 13px system-ui'; ctx.textAlign = 'left';
+  for (let i = 0; i < 9; i++) {
+    const c = i % 3, r = Math.floor(i / 3);
+    ctx.fillText(roomNames[i], c * RW + 16, r * RH + 22);
+  }
+  drawFurniture();
+}
+function drawBed(x, y, blanket) {
+  ctx.fillStyle = '#a9744f'; rr(x, y, 110, 64, 8); ctx.fill();
+  ctx.fillStyle = '#fff'; rr(x + 6, y + 6, 34, 52, 6); ctx.fill(); // pillow
+  ctx.fillStyle = blanket; rr(x + 38, y + 4, 66, 56, 8); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; rr(x + 46, y + 12, 50, 16, 7); ctx.fill();
+}
+function drawShelf(x, y, w, h, colors) {
+  ctx.fillStyle = '#a9744f'; rr(x, y, w, h, 5); ctx.fill();
+  ctx.fillStyle = '#8a5a3b';
+  const rows = Math.max(2, Math.floor(h / 30));
+  for (let i = 1; i < rows; i++) ctx.fillRect(x + 4, y + i * (h / rows), w - 8, 4);
+  for (let i = 0; i < 9; i++) {
+    ctx.fillStyle = colors[i % colors.length];
+    const col = i % 3, row = Math.floor(i / 3);
+    const bx = x + 8 + col * ((w - 18) / 3), by = y + 7 + row * (h / rows);
+    ctx.fillRect(bx, by, 7, 17);
+  }
+}
+function drawFurniture() {
+  drawBed(30, 26, '#ff8fab');                       // Jurnie's bed
+  drawBed(350, 26, '#b98cff');                      // Leah's bed
+  drawShelf(566, 24, 56, 92, ['#ff8fab', '#4dc3ff', '#ffd93d', '#7be495']);
+  // kitchen: counter + fridge + table
+  ctx.fillStyle = '#c98d5e'; rr(664, 22, 272, 40, 6); ctx.fill();
+  ctx.fillStyle = '#e8eef2'; rr(664, 22, 52, 62, 6); ctx.fill();
+  ctx.fillStyle = '#9fb3c8'; ctx.fillRect(664, 48, 52, 3);
+  ctx.fillStyle = '#ffe1a8'; ctx.beginPath(); ctx.ellipse(796, 139, 48, 31, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#a9744f'; ctx.fillRect(788, 164, 6, 12); ctx.fillRect(852, 164, 6, 12);
+  ctx.fillRect(710, 164, 6, 12); ctx.fillRect(788, 100, 6, 12);
+  // living room: sofa + TV
+  ctx.fillStyle = '#7fb5d5'; rr(34, 300, 128, 56, 14); ctx.fill();
+  ctx.fillStyle = '#6498b8'; rr(34, 288, 128, 22, 10); ctx.fill();
+  ctx.fillStyle = '#333'; rr(226, 238, 66, 36, 4); ctx.fill();
+  ctx.fillStyle = '#9fd8ff'; rr(230, 242, 58, 28, 3); ctx.fill();
+  // play room: toy box
+  ctx.fillStyle = '#ff9f68'; rr(430, 380, 90, 44, 8); ctx.fill();
+  ctx.fillStyle = '#e07f4e'; rr(424, 370, 102, 18, 8); ctx.fill();
+  ctx.fillStyle = '#ffd93d'; ctx.beginPath(); ctx.arc(452, 366, 12, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ff5d8f'; ctx.beginPath(); ctx.arc(496, 364, 10, 0, 7); ctx.fill();
+  // bathroom: tub + sink
+  ctx.fillStyle = '#fff'; rr(740, 300, 150, 74, 30); ctx.fill();
+  ctx.fillStyle = '#bfe9ff'; rr(752, 310, 126, 54, 24); ctx.fill();
+  ctx.fillStyle = '#e8eef2'; rr(884, 226, 48, 40, 8); ctx.fill();
+  // story corner: shelves + lamp
+  drawShelf(36, 452, 170, 44, ['#ffd93d', '#ff8fab', '#7be495', '#4dc3ff']);
+  ctx.fillStyle = '#ffd93d'; ctx.beginPath(); ctx.arc(262, 478, 13, 0, 7); ctx.fill();
+  ctx.fillStyle = '#a9744f'; ctx.fillRect(259, 488, 5, 26);
+  // garden room: planter + flowers
+  ctx.fillStyle = '#8a5a3b'; rr(440, 452, 120, 60, 8); ctx.fill();
+  ctx.fillStyle = '#5da85f'; rr(448, 460, 104, 44, 6); ctx.fill();
+  const fl = ['#ff5d8f', '#ffd93d', '#ff8fab', '#b98cff', '#fff'];
+  for (let i = 0; i < 9; i++) {
+    const fx = 462 + (i % 3) * 38, fy = 470 + Math.floor(i / 3) * 15;
+    ctx.fillStyle = fl[i % fl.length];
+    ctx.beginPath(); ctx.arc(fx, fy, 5, 0, 7); ctx.fill();
+  }
+  // toy room: shelf
+  drawShelf(660, 452, 58, 96, ['#ff5d8f', '#ffd93d', '#4dc3ff', '#ff9f68']);
+}
+
+// ---------- characters ----------
+function drawGirl(g, t) {
+  const bob = g.moving ? Math.sin(t / 90) * 2.2 : Math.sin(t / 600) * 0.8;
+  const y = g.y + bob, flip = g.face < 0 ? -1 : 1;
+  ctx.save(); ctx.translate(g.x, y);
+  // shadow
+  ctx.fillStyle = 'rgba(90,40,60,.18)';
+  ctx.beginPath(); ctx.ellipse(0, 26 - bob, 15, 5, 0, 0, 7); ctx.fill();
+  // legs + shoes
+  const step = g.moving ? Math.sin(t / 90) * 5 : 0;
+  ctx.fillStyle = g.skin;
+  ctx.fillRect(-8, 14, 6, 11 + step * 0.4); ctx.fillRect(2, 14, 6, 11 - step * 0.4);
+  ctx.fillStyle = '#fff';
+  rr(-10, 23 + step * 0.4, 10, 6, 3); ctx.fill(); rr(0, 23 - step * 0.4, 10, 6, 3); ctx.fill();
+  // dress with soft shading
+  const grad = ctx.createLinearGradient(0, -12, 0, 18);
+  grad.addColorStop(0, g.dress); grad.addColorStop(1, g.dressDark);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(-6, -12); ctx.lineTo(6, -12);
+  ctx.quadraticCurveTo(14, 6, 17, 17); ctx.lineTo(-17, 17);
+  ctx.quadraticCurveTo(-14, 6, -6, -12); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-6, -13, 12, 4); // collar
+  // arms
+  ctx.strokeStyle = g.skin; ctx.lineWidth = 5.5; ctx.lineCap = 'round';
+  const wave = g.waving ? Math.sin(t / 120) * 6 : 0;
+  ctx.beginPath(); ctx.moveTo(-7, -8); ctx.lineTo(-14, 4 + step * 0.3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(7, -8); ctx.lineTo(14, g.waving ? -12 + wave : 4 - step * 0.3); ctx.stroke();
+  // hair behind head (Leah: long)
+  if (g.longHair) {
+    ctx.fillStyle = g.hair;
+    rr(-14, -34, 7, 34, 3.5); ctx.fill(); rr(7, -34, 7, 34, 3.5); ctx.fill();
+  }
+  // head
+  const skinGrad = ctx.createRadialGradient(-4, -26, 3, 0, -24, 17);
+  skinGrad.addColorStop(0, '#ffe9d6'); skinGrad.addColorStop(0.45, g.skin); skinGrad.addColorStop(1, g.skinDark);
+  ctx.fillStyle = skinGrad;
+  ctx.beginPath(); ctx.arc(0, -24, 14.5, 0, 7); ctx.fill();
+  // hair top + Jurnie's two puffs
+  ctx.fillStyle = g.hair;
+  ctx.beginPath(); ctx.arc(0, -29, 14.5, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+  ctx.fillRect(-14.5, -31, 29, 4);
+  if (!g.longHair) {
+    ctx.beginPath(); ctx.arc(-13, -36, 6.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(13, -36, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = g.bow;
+    ctx.beginPath(); ctx.arc(-13, -36, 2.6, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(13, -36, 2.6, 0, 7); ctx.fill();
+  } else {
+    ctx.fillStyle = g.bow;
+    ctx.beginPath(); ctx.moveTo(8 * flip, -38); ctx.lineTo(15 * flip, -41); ctx.lineTo(15 * flip, -34); ctx.fill();
+  }
+  // face: big eyes, smile, blush
+  ctx.fillStyle = '#33222a';
+  ctx.beginPath(); ctx.ellipse(-5.2, -23, 1.9, 2.7, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(5.2, -23, 1.9, 2.7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-5.8, -24, 0.8, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(4.6, -24, 0.8, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#33222a'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -18.5, 4.4, Math.PI * 0.18, Math.PI * 0.82); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,120,160,.4)';
+  ctx.beginPath(); ctx.ellipse(-9.5, -19, 3.2, 2, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(9.5, -19, 3.2, 2, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawCat(c, t) {
+  const wag = Math.sin(t / 220) * 0.35;
+  const y = c.y + (c.moving ? Math.abs(Math.sin(t / 130)) * -1.6 : 0);
+  ctx.save(); ctx.translate(c.x, y);
+  ctx.fillStyle = 'rgba(90,40,60,.15)';
+  ctx.beginPath(); ctx.ellipse(0, 15, 14, 4.5, 0, 0, 7); ctx.fill();
+  // tail
+  ctx.strokeStyle = '#e8e2da'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-13 * c.face, 8);
+  ctx.quadraticCurveTo(-24 * c.face, 2, -20 * c.face + Math.sin(t / 220) * 3, -10 + wag * 6); ctx.stroke();
+  // fluffy body
+  ctx.fillStyle = '#f4efe8';
+  ctx.beginPath(); ctx.ellipse(0, 5, 16, 11, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ddd5cc';
+  ctx.beginPath(); ctx.ellipse(-4, 1, 8, 6, -0.4, 0, 7); ctx.fill(); // grey patch
+  // paws
+  ctx.fillStyle = '#f4efe8';
+  ctx.beginPath(); ctx.ellipse(-7, 14, 4.5, 3, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(7, 14, 4.5, 3, 0, 0, 7); ctx.fill();
+  // head
+  ctx.fillStyle = '#f4efe8';
+  ctx.beginPath(); ctx.arc(10 * c.face, -6, 10, 0, 7); ctx.fill();
+  // ears
+  ctx.fillStyle = '#f4efe8';
+  ctx.beginPath(); ctx.moveTo(3 * c.face, -13); ctx.lineTo(6 * c.face, -20); ctx.lineTo(10 * c.face, -14); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(12 * c.face, -14); ctx.lineTo(17 * c.face, -19); ctx.lineTo(18 * c.face, -11); ctx.fill();
+  ctx.fillStyle = '#ffb3c8';
+  ctx.beginPath(); ctx.moveTo(5.4 * c.face, -14.4); ctx.lineTo(6.6 * c.face, -17.4); ctx.lineTo(8.6 * c.face, -13.8); ctx.fill();
+  // face
+  ctx.fillStyle = '#33222a';
+  const blink = (t % 3400) < 130 ? 0.4 : 2.2;
+  ctx.beginPath(); ctx.ellipse(6.5 * c.face, -6, 1.4, blink, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(13.5 * c.face, -6, 1.4, blink, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ff8fab';
+  ctx.beginPath(); ctx.moveTo(9.2 * c.face, -3.4); ctx.lineTo(11 * c.face, -3.4); ctx.lineTo(10.1 * c.face, -1.9); ctx.fill();
+  ctx.strokeStyle = 'rgba(51,34,42,.55)'; ctx.lineWidth = 0.8;
+  for (const s of [-1, 1]) for (let i = 0; i < 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(16 * c.face, -4 + i * 2.4);
+    ctx.lineTo((16 + 6 * s * 0 + 6) * c.face, -6 + i * 3.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// actors
+const jurnie = { x: 160, y: 340, face: 1, moving: false, waving: false,
+  skin: '#f2c29b', skinDark: '#dfa878', hair: '#4a2c1a', dress: '#ff6fae', dressDark: '#e7549c', bow: '#ffd93d' };
+const leah = { x: 420, y: 120, face: -1, moving: false, waving: false, longHair: true,
+  skin: '#f7cfae', skinDark: '#e8b98d', hair: '#2e1c10', dress: '#9d7bff', dressDark: '#7f5fe0', bow: '#ff8fab' };
+const fancy = { x: 260, y: 420, face: 1, moving: false, tx: 260, ty: 420, wait: 0 };
+
+// ---------- speech bubbles & talking ----------
+const bubbles = []; // {who, text, until}
+function showBubble(who, text, ms = 3400) {
+  bubbles.length = 0;
+  bubbles.push({ who, text, until: performance.now() + ms });
+}
+function drawBubble(b, t) {
+  const who = b.who;
+  const bx = who.x, by = who.y - 62;
+  ctx.font = '600 13.5px system-ui';
+  const words = b.text.split(' ');
+  const lines = []; let line = '';
+  for (const w of words) {
+    if ((line + ' ' + w).trim().length > 24 && line) { lines.push(line); line = w; }
+    else line = (line + ' ' + w).trim();
+  }
+  if (line) lines.push(line);
+  const wpx = Math.max(...lines.map(l => ctx.measureText(l).width)) + 22;
+  const hpx = lines.length * 18 + 16;
+  const x = Math.max(8, Math.min(W - wpx - 8, bx - wpx / 2));
+  const y = Math.max(46, by - hpx);
+  ctx.fillStyle = 'rgba(255,255,255,.96)';
+  ctx.strokeStyle = '#f3b8d2'; ctx.lineWidth = 2;
+  rr(x, y, wpx, hpx, 12); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(bx - 6, y + hpx - 1); ctx.lineTo(bx + 6, y + hpx - 1); ctx.lineTo(bx, y + hpx + 9);
+  ctx.closePath(); ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.fill();
+  ctx.fillStyle = '#4a2b3a'; ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, x + wpx / 2, y + 21 + i * 18));
+  ctx.textAlign = 'left';
+}
+
+const leahLines = [
+  "Hi Jurnie! I'm so glad you're here!",
+  "L is for Leah — and for LOVE!",
+  "Can you count the squishies we find?",
+  "Check behind the furniture, too!",
+  "You're the best little sister ever!",
+  "A B C D… sing with me, Jurnie!",
+  "The Garden Room smells like flowers!",
+  "Let's read a story when we're done!",
+];
+const fancyLines = [
+  "Meow! (That means hello!)",
+  "Purr… purr… I love pets!",
+  "Meow meow! (I smell a squishy nearby!)",
+  "I took a nap on the squishies. So soft!",
+  "Mrrrow! (Follow me, Jurnie!)",
+  "Purr purr purr… happy cat!",
+];
+const jurnieLines = [
+  "I love my house!",
+  "Where are the squishies hiding?",
+  "Leah is the best big sister!",
+  "Fancy is so fluffy!",
+];
+let leahIdx = 0, fancyIdx = 0, jurnieIdx = 0;
+function tryInteract() {
+  if (!started || won) return;
+  const dL = Math.hypot(jurnie.x - leah.x, jurnie.y - leah.y);
+  const dF = Math.hypot(jurnie.x - fancy.x, jurnie.y - fancy.y);
+  if (dL < 64) {
+    const line = leahLines[leahIdx++ % leahLines.length];
+    leah.waving = true; setTimeout(() => leah.waving = false, 1600);
+    leah.face = jurnie.x >= leah.x ? 1 : -1;
+    showBubble(leah, line); speak(line, 1.15);
+  } else if (dF < 56) {
+    const line = fancyLines[fancyIdx++ % fancyLines.length];
+    showBubble(fancy, line);
+    if (talkOn) { meowSound(); setTimeout(() => speak(line, 1.6), 350); }
+    else meowSound();
+  }
+}
+
+// ---------- squishies & NeeDohs ----------
+function star(r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 ? r * 0.55 : r, a = i * Math.PI / 5 - Math.PI / 2;
+    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rad, Math.sin(a) * rad);
+  }
+  ctx.closePath();
+}
+function heart(r) {
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.85);
+  ctx.bezierCurveTo(-r * 1.25, 0, -r * 0.72, -r, 0, -r * 0.42);
+  ctx.bezierCurveTo(r * 0.72, -r, r * 1.25, 0, 0, r * 0.85);
+  ctx.closePath();
+}
+function drawSquishy(s, t) {
+  const squash = 1 + Math.sin(t / 480 + s.x) * 0.06;
+  ctx.save(); ctx.translate(s.x, s.y); ctx.scale(1, squash);
+  ctx.fillStyle = 'rgba(90,40,60,.14)';
+  ctx.beginPath(); ctx.ellipse(0, 12 / squash, 13, 4, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = s.color; ctx.strokeStyle = 'rgba(120,60,90,.35)'; ctx.lineWidth = 1.6;
+  const r = 13;
+  if (s.shape === 'star') { star(r + 2); ctx.fill(); ctx.stroke(); }
+  else if (s.shape === 'heart') { heart(r); ctx.fill(); ctx.stroke(); }
+  else if (s.shape === 'bear') {
+    ctx.beginPath(); ctx.arc(-8, -9, 5.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(8, -9, 5.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 11.5, 0, 7); ctx.fill(); ctx.stroke();
+  } else if (s.shape === 'bunny') {
+    ctx.beginPath(); ctx.ellipse(-5, -14, 3.6, 8, -0.15, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(5, -14, 3.6, 8, 0.15, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 1, 10.5, 0, 7); ctx.fill(); ctx.stroke();
+  } else { // cloud
+    ctx.beginPath();
+    ctx.arc(-7, 3, 7, 0, 7); ctx.arc(0, -3, 9, 0, 7); ctx.arc(8, 3, 7, 0, 7); ctx.arc(0, 5, 8, 0, 7);
+    ctx.fill(); ctx.stroke();
+  }
+  // cute face
+  ctx.fillStyle = '#4a2b3a';
+  ctx.beginPath(); ctx.arc(-3.4, -1, 1.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.4, -1, 1.3, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.arc(0, 1.6, 2.6, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.restore();
+  drawTwinkle(s.x, s.y, t);
+}
+function drawNeedoh(n, t) {
+  ctx.save(); ctx.translate(n.x, n.y + Math.sin(t / 500 + n.x) * 1.2);
+  ctx.fillStyle = 'rgba(90,40,60,.14)';
+  ctx.beginPath(); ctx.ellipse(0, 10, 11, 3.6, 0, 0, 7); ctx.fill();
+  const g = ctx.createRadialGradient(-4, -5, 2, 0, 0, 13);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.25, n.color); g.addColorStop(1, shade(n.color));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.beginPath(); ctx.ellipse(-4.5, -5.5, 3.4, 2.2, -0.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4a2b3a';
+  ctx.beginPath(); ctx.arc(-3, 0.5, 1.2, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3, 0.5, 1.2, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 3, 2.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.restore();
+  drawTwinkle(n.x, n.y, t);
+}
+function shade(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, (n >> 16) - 45), g = Math.max(0, ((n >> 8) & 255) - 45), b = Math.max(0, (n & 255) - 45);
+  return `rgb(${r},${g},${b})`;
+}
+function drawTwinkle(x, y, t) {
+  const p = ((t / 700) + x * 0.01) % 1;
+  ctx.save(); ctx.translate(x + 14, y - 14); ctx.rotate(p * 1.2);
+  ctx.globalAlpha = Math.sin(p * Math.PI) * 0.9;
+  ctx.fillStyle = '#ffcf3f';
+  const s = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, -s); ctx.lineTo(1.6, -1.6); ctx.lineTo(s, 0); ctx.lineTo(1.6, 1.6);
+  ctx.lineTo(0, s); ctx.lineTo(-1.6, 1.6); ctx.lineTo(-s, 0); ctx.lineTo(-1.6, -1.6);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// ---------- confetti for the big win ----------
+const confetti = [];
+function burstConfetti() {
+  const colors = ['#ff5d8f', '#ffd93d', '#4dc3ff', '#7be495', '#b98cff', '#ff9f68'];
+  for (let i = 0; i < 130; i++) {
+    confetti.push({ x: Math.random() * W, y: -20 - Math.random() * 160,
+      vx: (Math.random() - 0.5) * 1.4, vy: 1.4 + Math.random() * 2.2,
+      s: 4 + Math.random() * 5, c: colors[i % colors.length], rot: Math.random() * 7, vr: (Math.random() - .5) * .2 });
+  }
+}
+function drawConfetti(dt) {
+  for (const p of confetti) {
+    p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    if (p.y > H + 20) p.y = -20;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+    ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.62);
+    ctx.restore();
+  }
+}
+
+// ---------- game logic ----------
+const sqEl = document.getElementById('sqCount'), ndEl = document.getElementById('ndCount');
+const toast = document.getElementById('roomToast'), talkBtn = document.getElementById('talkBtn');
+let curRoom = -1, toastTimer = null;
+function updateHUD() { sqEl.textContent = sqFound + '/10'; ndEl.textContent = ndFound + '/8'; }
+function checkPickups() {
+  for (const s of squishies) {
+    if (!s.found && Math.hypot(jurnie.x - s.x, jurnie.y - s.y) < 26) {
+      s.found = true; sqFound++; updateHUD(); popSound();
+      showBubble(jurnie, 'Found a squishy! 🧸', 1800);
+      if (!won) speak('Found a squishy!', 1.45);
+    }
+  }
+  for (const n of needohs) {
+    if (!n.found && Math.hypot(jurnie.x - n.x, jurnie.y - n.y) < 26) {
+      n.found = true; ndFound++; updateHUD(); sparkleSound();
+      showBubble(jurnie, 'Found a NeeDoh! 🫧', 1800);
+      if (!won) speak('Found a NeeDoh!', 1.45);
+    }
+  }
+  if (!won && sqFound === 10 && ndFound === 8) {
+    won = true; burstConfetti();
+    leah.waving = true;
+    showBubble(leah, '🎉 You found them ALL! Amazing, Jurnie!', 6000);
+    speak('You found them all! Amazing, Jurnie!', 1.2);
+    [523, 659, 784, 1046].forEach((f, i) => beep(f, .22, 'triangle', .14, i * .13));
+  }
+}
+function updateFancy(dt) {
+  fancy.wait -= dt;
+  const dx = fancy.tx - fancy.x, dy = fancy.ty - fancy.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 6) {
+    fancy.moving = false;
+    if (fancy.wait <= 0) {
+      fancy.tx = 40 + Math.random() * (W - 80);
+      fancy.ty = 50 + Math.random() * (H - 90);
+      fancy.wait = 1400 + Math.random() * 2600;
+    }
+  } else {
+    fancy.moving = true;
+    fancy.face = dx >= 0 ? 1 : -1;
+    const sp = 0.055 * dt;
+    moveActor(fancy, dx / d * sp, dy / d * sp, 10);
+    if (fancy.wait <= 0) { // pick a new wander target now and then (also unsticks her)
+      fancy.tx = 40 + Math.random() * (W - 80);
+      fancy.ty = 50 + Math.random() * (H - 90);
+      fancy.wait = 2200 + Math.random() * 2600;
+    }
+  }
+}
+let lastRoomCheck = 0;
+function updatePlayer(dt) {
+  let dx = 0, dy = 0;
+  if (keys['a'] || keys['arrowleft']) dx -= 1;
+  if (keys['d'] || keys['arrowright']) dx += 1;
+  if (keys['w'] || keys['arrowup']) dy -= 1;
+  if (keys['s'] || keys['arrowdown']) dy += 1;
+  if (joyActive) { dx += joyVec.x; dy += joyVec.y; }
+  const m = Math.hypot(dx, dy);
+  jurnie.moving = m > 0.12;
+  if (jurnie.moving) {
+    const sp = 0.16 * dt;
+    if (Math.abs(dx) > 0.1) jurnie.face = dx > 0 ? 1 : -1;
+    moveActor(jurnie, dx / Math.max(1, m) * sp, dy / Math.max(1, m) * sp, 12);
+  }
+  const r = roomAt(jurnie.x, jurnie.y);
+  if (r !== curRoom && performance.now() - lastRoomCheck > 300) {
+    curRoom = r;
+    toast.textContent = roomNames[r]; toast.style.opacity = 1;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.style.opacity = 0, 1600);
+  }
+  const near = Math.hypot(jurnie.x - leah.x, jurnie.y - leah.y) < 64 ||
+               Math.hypot(jurnie.x - fancy.x, jurnie.y - fancy.y) < 56;
+  talkBtn.classList.toggle('ready', near && started && !won);
+}
+
+// ---------- main loop ----------
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(50, now - lastT); lastT = now;
+  ctx.clearRect(0, 0, W, H);
+  drawHouse();
+  for (const s of squishies) if (!s.found) drawSquishy(s, now);
+  for (const n of needohs) if (!n.found) drawNeedoh(n, now);
+  if (started) {
+    updatePlayer(dt); updateFancy(dt); checkPickups();
+  }
+  // draw actors sorted by y so nearer ones overlap right
+  const actors = [
+    { y: fancy.y, draw: () => drawCat(fancy, now) },
+    { y: leah.y, draw: () => drawGirl(leah, now) },
+    { y: jurnie.y, draw: () => drawGirl(jurnie, now) },
+  ].sort((a, b) => a.y - b.y);
+  for (const a of actors) a.draw();
+  // bubbles
+  if (bubbles.length && now < bubbles[0].until) drawBubble(bubbles[0], now);
+  else bubbles.length = 0;
+  if (won) {
+    drawConfetti(dt);
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.strokeStyle = '#f3b8d2'; ctx.lineWidth = 3;
+    rr(W / 2 - 235, 66, 470, 58, 18); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d63384'; ctx.font = '800 25px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('🎉 You found ALL the squishies & NeeDohs! 🎉', W / 2, 103);
+    ctx.textAlign = 'left';
+  }
+  requestAnimationFrame(frame);
+}
+updateHUD();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
