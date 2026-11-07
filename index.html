@@ -34,9 +34,28 @@
     position: absolute; top: 58px; left: 50%; transform: translateX(-50%);
     background: rgba(74,43,58,.85); color: #ffe9f3; padding: 5px 18px; border-radius: 999px;
     font-weight: 700; font-size: 15px; opacity: 0; transition: opacity .35s; z-index: 5; pointer-events: none;
+    max-width: 92vw; text-align: center;
   }
+  #missionBanner {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(74,43,58,.9); color: #ffe9f3; padding: 7px 20px; border-radius: 999px;
+    font-weight: 700; font-size: 14.5px; z-index: 5; pointer-events: none;
+    max-width: 94vw; text-align: center; box-shadow: 0 4px 14px rgba(90,40,60,.3);
+  }
+  #missionBanner .mb { color: #ffd93d; }
+  #questPanel {
+    position: absolute; top: 56px; right: 10px; z-index: 8; display: none;
+    background: rgba(255,255,255,.97); border: 2px solid #f3b8d2; border-radius: 14px;
+    padding: 12px 16px; width: 276px; max-width: 86vw; box-shadow: 0 8px 24px rgba(150,60,110,.25);
+  }
+  #questPanel.open { display: block; }
+  #questPanel h3 { color: #d63384; font-size: 16px; margin-bottom: 6px; }
+  #questPanel li { list-style: none; font-size: 13.5px; padding: 3.5px 0; }
+  #questPanel li .st { float: right; font-weight: 800; color: #d63384; }
+  #questPanel li.done { color: #a08b99; }
+  #questPanel li.done .txt { text-decoration: line-through; }
   #talkBtn {
-    position: absolute; right: 18px; bottom: 20px; z-index: 6;
+    position: absolute; right: 18px; bottom: 56px; z-index: 6;
     width: 74px; height: 74px; border-radius: 50%; font-size: 32px;
     border: 3px solid #f3b8d2; background: rgba(255,255,255,.94); cursor: pointer;
     box-shadow: 0 4px 14px rgba(150,60,110,.3); display: none;
@@ -44,7 +63,7 @@
   #talkBtn.ready { display: block; animation: bob 1s ease-in-out infinite; }
   @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
   #joy {
-    position: absolute; left: 18px; bottom: 20px; width: 96px; height: 96px; z-index: 6; display: none;
+    position: absolute; left: 18px; bottom: 56px; width: 96px; height: 96px; z-index: 6; display: none;
   }
   #joyBase {
     position: absolute; inset: 0; border-radius: 50%;
@@ -61,7 +80,7 @@
     background: radial-gradient(ellipse at center, rgba(255,233,243,.88), rgba(255,214,232,.96));
   }
   #start h1 { font-size: clamp(38px, 8vw, 64px); color: #d63384; letter-spacing: 1px; text-shadow: 0 3px 0 #fff; }
-  #start p { font-size: clamp(15px, 3.4vw, 19px); max-width: 520px; line-height: 1.45; }
+  #start p { font-size: clamp(15px, 3.4vw, 19px); max-width: 540px; line-height: 1.45; }
   #playBtn {
     font-size: 24px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ff7eb6, #e7549c);
     border: none; border-radius: 999px; padding: 14px 44px; cursor: pointer;
@@ -78,19 +97,25 @@
   <div id="hud">
     <div class="pill">🧸 Squishies <b id="sqCount">0/10</b></div>
     <div class="pill">🫧 NeeDoh <b id="ndCount">0/8</b></div>
+    <div class="pill">⭐ <b id="starCount">0/12</b></div>
+    <button id="questBtn" title="Missions">📋</button>
     <button id="soundBtn" title="Talking voices on/off">🔊</button>
   </div>
   <div id="roomToast"></div>
-  <button id="talkBtn" title="Talk">💬</button>
+  <div id="questPanel"><h3>📋 Jurnie's Missions</h3><ul id="questList"></ul></div>
+  <div id="missionBanner">🎯 <span class="mb">Mission:</span> <span id="missionText">Say hello to Leah!</span></div>
+  <button id="talkBtn" title="Talk / Do">💬</button>
   <div id="joy"><div id="joyBase"></div><div id="joyKnob"></div></div>
 
   <div id="start">
     <h1>🌈 JurnieGo 🌈</h1>
     <p>Help <b>Jurnie</b> explore the cozy house with her sister <b>Leah</b> and their cat <b>Fancy</b>!<br>
-    Squishies and NeeDohs are hiding in every room — can you find them all?</p>
+    Squishies and NeeDohs are hiding everywhere — and there are <b>12 missions</b> to finish.<br>
+    Water flowers 🌸, build a block tower 🧱, make friends with a butterfly 🦋!</p>
     <button id="playBtn">▶ Play</button>
     <p class="hint">Move: WASD / arrow keys, or the joystick on touch screens<br>
-    Walk up to Leah or Fancy and press <b>E</b> (or tap 💬) to talk to them!</p>
+    Walk up to people and things, then press <b>E</b> (or tap 💬) to talk and play!<br>
+    Tap 📋 any time to see your missions.</p>
   </div>
 </div>
 
@@ -116,6 +141,7 @@ window.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
   if (e.key.toLowerCase() === 'e') tryInteract();
+  if (e.key.toLowerCase() === 'q') toggleQuests();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -158,6 +184,8 @@ function beep(freq, dur = 0.12, type = 'sine', vol = 0.15, when = 0) {
 }
 function popSound() { beep(520, .09, 'sine', .18); beep(780, .12, 'sine', .15, .06); }
 function sparkleSound() { [880, 1174, 1568].forEach((f, i) => beep(f, .1, 'triangle', .12, i * .05)); }
+function chimeSound() { [659, 784, 988, 1318].forEach((f, i) => beep(f, .16, 'triangle', .13, i * .09)); }
+function splashSound() { beep(300, .08, 'sine', .1); beep(420, .1, 'sine', .1, .05); beep(560, .12, 'sine', .09, .1); }
 function meowSound() { beep(620, .16, 'sawtooth', .05); beep(440, .2, 'sawtooth', .05, .13); }
 function speak(text, pitch) {
   if (!talkOn || !('speechSynthesis' in window)) return;
@@ -178,8 +206,8 @@ document.getElementById('playBtn').addEventListener('click', () => {
   document.getElementById('start').style.display = 'none';
   started = true;
   try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
-  showBubble(jurnie, "Let's find the squishies!", 2600);
-  speak("Let's find the squishies!", 1.45);
+  showBubble(jurnie, "Let's do our missions!", 2600);
+  speak("Let's do our missions!", 1.45);
 });
 
 // ---------- the cozy house: 3 x 3 rooms ----------
@@ -199,11 +227,10 @@ function roomAt(x, y) {
 // walls: outer border + inner dividers with door gaps
 const walls = [];
 (function buildWalls() {
-  const T = 12; // outer thickness
+  const T = 12;
   walls.push({ x: 0, y: 0, w: W, h: T }, { x: 0, y: H - T, w: W, h: T },
              { x: 0, y: 0, w: T, h: H }, { x: W - T, y: 0, w: T, h: H });
   const gap = 84;
-  // vertical dividers at x=320 and x=640, one door per room row
   for (const dx of [320, 640]) {
     for (let r = 0; r < 3; r++) {
       const y0 = r * RH, y1 = (r + 1) * RH, gc = y0 + RH / 2;
@@ -211,7 +238,6 @@ const walls = [];
       walls.push({ x: dx - 5, y: gc + gap / 2, w: 10, h: y1 - (gc + gap / 2) });
     }
   }
-  // horizontal dividers at y=213.33 and y=426.67, one door per room column
   for (const dy of [RH, RH * 2]) {
     for (let c = 0; c < 3; c++) {
       const x0 = c * RW, x1 = (c + 1) * RW, gc = x0 + RW / 2;
@@ -221,7 +247,6 @@ const walls = [];
   }
 })();
 
-// furniture blockers (soft obstacles) per room
 const blockers = [
   { x: 30, y: 26, w: 110, h: 64 },    // Jurnie's bed
   { x: 350, y: 26, w: 110, h: 64 },   // Leah's bed
@@ -250,8 +275,6 @@ function moveActor(a, dx, dy, r) {
 }
 
 // ---------- hide the squishies & NeeDohs ----------
-// squishy shapes: star, heart, bear, cloud, bunny — soft toys that squash a little
-// needoh: glossy squeeze balls
 const squishies = [
   { x: 268, y: 60,  shape: 'star',  color: '#ffd93d', found: false },
   { x: 512, y: 168, shape: 'heart', color: '#ff8fab', found: false },
@@ -276,43 +299,104 @@ const needohs = [
 ];
 let sqFound = 0, ndFound = 0, won = false;
 
+// garden flowers to water
+const flowers = [
+  { x: 356, y: 520, color: '#ff5d8f', watered: false },
+  { x: 356, y: 596, color: '#ffd93d', watered: false },
+  { x: 596, y: 520, color: '#b98cff', watered: false },
+  { x: 596, y: 600, color: '#ff9f68', watered: false },
+  { x: 480, y: 596, color: '#4dc3ff', watered: false },
+];
+let flowersWatered = 0;
+
+// butterflies in the Garden Room
+const butterflies = [
+  { x: 400, y: 500, tx: 400, ty: 500, color: '#ff8fab', phase: 0, landed: false, landUntil: 0 },
+  { x: 520, y: 560, tx: 520, ty: 560, color: '#b98cff', phase: 2, landed: false, landUntil: 0 },
+  { x: 470, y: 480, tx: 470, ty: 480, color: '#ffb340', phase: 4, landed: false, landUntil: 0 },
+];
+let butterflyFriend = false, butterflyNearTime = 0;
+
 // ---------- drawing helpers ----------
-function rr(x, y, w, h, r) { // rounded rect path
+function rr(x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
-function drawHouse() {
-  // floors
+function drawHouse(t) {
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-    ctx.fillStyle = roomFloors[r * 3 + c];
-    ctx.fillRect(c * RW, r * RH, RW, RH);
+    const i = r * 3 + c, x0 = c * RW, y0 = r * RH;
+    ctx.fillStyle = roomFloors[i];
+    ctx.fillRect(x0, y0, RW, RH);
+    // floor pattern: tiles in kitchen/bathroom, planks elsewhere
+    ctx.strokeStyle = 'rgba(120,70,40,.07)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (i === 2 || i === 5) {
+      for (let gx = x0 + 40; gx < x0 + RW; gx += 40) { ctx.moveTo(gx, y0); ctx.lineTo(gx, y0 + RH); }
+      for (let gy = y0 + 40; gy < y0 + RH; gy += 40) { ctx.moveTo(x0, gy); ctx.lineTo(x0 + RW, gy); }
+    } else {
+      for (let gy = y0 + 27; gy < y0 + RH; gy += 27) { ctx.moveTo(x0, gy); ctx.lineTo(x0 + RW, gy); }
+    }
+    ctx.stroke();
+    // soft inner border so each room feels finished
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 3;
+    rr(x0 + 7, y0 + 7, RW - 14, RH - 14, 12); ctx.stroke();
   }
+  // sunbeams in Jurnie's room + Garden room
+  ctx.fillStyle = 'rgba(255,236,160,.20)';
+  ctx.beginPath(); ctx.moveTo(150, 0); ctx.lineTo(240, 0); ctx.lineTo(310, 130); ctx.lineTo(190, 130); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(430, 427); ctx.lineTo(520, 427); ctx.lineTo(580, 560); ctx.lineTo(460, 560); ctx.fill();
   // rugs
   ctx.fillStyle = 'rgba(255,255,255,.45)';
   rr(88, 118, 150, 66, 30); ctx.fill();
   rr(70, 372, 170, 60, 30); ctx.fill();
-  rr(700, 500, 200, 90, 26); ctx.fill();
-  // walls
-  ctx.fillStyle = '#b08968';
+  rr(736, 500, 190, 92, 26); ctx.fill();
+  // star rug in the Play Room
+  ctx.save(); ctx.translate(480, 330); ctx.fillStyle = 'rgba(255,217,61,.35)';
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 ? 20 : 44, a = i * Math.PI / 5 - Math.PI / 2;
+    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rad, Math.sin(a) * rad);
+  }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+  // walls with a warm wood gradient
+  const wg = ctx.createLinearGradient(0, 0, 0, H);
+  wg.addColorStop(0, '#c09a72'); wg.addColorStop(1, '#a87c54');
+  ctx.fillStyle = wg;
   for (const wl of walls) ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
   ctx.fillStyle = 'rgba(255,255,255,.35)';
   for (const wl of walls) if (wl.h <= 12) ctx.fillRect(wl.x, wl.y, wl.w, 3);
   // room labels
-  ctx.fillStyle = 'rgba(120,70,95,.55)';
+  ctx.fillStyle = 'rgba(120,70,95,.6)';
   ctx.font = '700 13px system-ui'; ctx.textAlign = 'left';
   for (let i = 0; i < 9; i++) {
     const c = i % 3, r = Math.floor(i / 3);
     ctx.fillText(roomNames[i], c * RW + 16, r * RH + 22);
   }
-  drawFurniture();
+  drawFurniture(t);
+  // drifting dust motes for a soft, alive feel
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  for (let i = 0; i < 14; i++) {
+    const mx = (i * 173 + t * 0.008 * (1 + i % 3)) % W;
+    const my = 40 + ((i * 97) % 560) + Math.sin(t / 1600 + i) * 8;
+    ctx.globalAlpha = 0.16 + 0.14 * Math.sin(t / 900 + i * 2);
+    ctx.beginPath(); ctx.arc(mx, my, 2.2, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 function drawBed(x, y, blanket) {
   ctx.fillStyle = '#a9744f'; rr(x, y, 110, 64, 8); ctx.fill();
-  ctx.fillStyle = '#fff'; rr(x + 6, y + 6, 34, 52, 6); ctx.fill(); // pillow
+  ctx.fillStyle = '#fff'; rr(x + 6, y + 6, 34, 52, 6); ctx.fill();
   ctx.fillStyle = blanket; rr(x + 38, y + 4, 66, 56, 8); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.5)'; rr(x + 46, y + 12, 50, 16, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x + 54 + i * 18, y + 20 + (i % 2) * 18, 4, 0, 7); ctx.fill(); }
+  // teddy bear sitting on the bed
+  ctx.fillStyle = '#c98d5e';
+  ctx.beginPath(); ctx.arc(x + 20, y + 24, 3.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 30, y + 24, 3.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 25, y + 30, 6.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 25, y + 40, 5.4, 6.4, 0, 0, 7); ctx.fill();
 }
 function drawShelf(x, y, w, h, colors) {
   ctx.fillStyle = '#a9744f'; rr(x, y, w, h, 5); ctx.fill();
@@ -326,33 +410,50 @@ function drawShelf(x, y, w, h, colors) {
     ctx.fillRect(bx, by, 7, 17);
   }
 }
-function drawFurniture() {
-  drawBed(30, 26, '#ff8fab');                       // Jurnie's bed
-  drawBed(350, 26, '#b98cff');                      // Leah's bed
+function drawFurniture(t) {
+  drawBed(30, 26, '#ff8fab');
+  drawBed(350, 26, '#b98cff');
   drawShelf(566, 24, 56, 92, ['#ff8fab', '#4dc3ff', '#ffd93d', '#7be495']);
-  // kitchen: counter + fridge + table
+  // kitchen: counter + fridge with magnets + table with a fruit bowl
   ctx.fillStyle = '#c98d5e'; rr(664, 22, 272, 40, 6); ctx.fill();
   ctx.fillStyle = '#e8eef2'; rr(664, 22, 52, 62, 6); ctx.fill();
   ctx.fillStyle = '#9fb3c8'; ctx.fillRect(664, 48, 52, 3);
+  const mg = ['#ff5d8f', '#ffd93d', '#4dc3ff'];
+  mg.forEach((m, i) => { ctx.fillStyle = m; ctx.beginPath(); ctx.arc(676 + i * 13, 34, 3.4, 0, 7); ctx.fill(); });
   ctx.fillStyle = '#ffe1a8'; ctx.beginPath(); ctx.ellipse(796, 139, 48, 31, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#a9744f'; ctx.fillRect(788, 164, 6, 12); ctx.fillRect(852, 164, 6, 12);
   ctx.fillRect(710, 164, 6, 12); ctx.fillRect(788, 100, 6, 12);
-  // living room: sofa + TV
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(796, 132, 17, 8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ff5d5d'; ctx.beginPath(); ctx.arc(788, 128, 6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffb340'; ctx.beginPath(); ctx.arc(800, 126, 6.4, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7be495'; ctx.beginPath(); ctx.arc(806, 130, 5.4, 0, 7); ctx.fill();
+  // living room: sofa + cushions + TV
   ctx.fillStyle = '#7fb5d5'; rr(34, 300, 128, 56, 14); ctx.fill();
   ctx.fillStyle = '#6498b8'; rr(34, 288, 128, 22, 10); ctx.fill();
+  ctx.fillStyle = '#ffd93d'; rr(48, 314, 26, 26, 6); ctx.fill();
+  ctx.fillStyle = '#ff8fab'; rr(116, 314, 26, 26, 6); ctx.fill();
   ctx.fillStyle = '#333'; rr(226, 238, 66, 36, 4); ctx.fill();
   ctx.fillStyle = '#9fd8ff'; rr(230, 242, 58, 28, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.65)'; rr(234, 245, 20, 8, 3); ctx.fill();
   // play room: toy box
   ctx.fillStyle = '#ff9f68'; rr(430, 380, 90, 44, 8); ctx.fill();
   ctx.fillStyle = '#e07f4e'; rr(424, 370, 102, 18, 8); ctx.fill();
   ctx.fillStyle = '#ffd93d'; ctx.beginPath(); ctx.arc(452, 366, 12, 0, 7); ctx.fill();
   ctx.fillStyle = '#ff5d8f'; ctx.beginPath(); ctx.arc(496, 364, 10, 0, 7); ctx.fill();
-  // bathroom: tub + sink
+  // bathroom: tub with bubbles + sink
   ctx.fillStyle = '#fff'; rr(740, 300, 150, 74, 30); ctx.fill();
   ctx.fillStyle = '#bfe9ff'; rr(752, 310, 126, 54, 24); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  [[776, 326, 7], [806, 338, 9], [840, 324, 6], [822, 318, 5]].forEach(([bx, by, br]) => {
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill();
+  });
   ctx.fillStyle = '#e8eef2'; rr(884, 226, 48, 40, 8); ctx.fill();
-  // story corner: shelves + lamp
+  ctx.fillStyle = '#9fd8ff'; rr(892, 234, 32, 12, 5); ctx.fill();
+  // story corner: shelves + glowing lamp
   drawShelf(36, 452, 170, 44, ['#ffd93d', '#ff8fab', '#7be495', '#4dc3ff']);
+  const glow = ctx.createRadialGradient(262, 478, 2, 262, 478, 30);
+  glow.addColorStop(0, 'rgba(255,217,61,.5)'); glow.addColorStop(1, 'rgba(255,217,61,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(262, 478, 30, 0, 7); ctx.fill();
   ctx.fillStyle = '#ffd93d'; ctx.beginPath(); ctx.arc(262, 478, 13, 0, 7); ctx.fill();
   ctx.fillStyle = '#a9744f'; ctx.fillRect(259, 488, 5, 26);
   // garden room: planter + flowers
@@ -367,22 +468,130 @@ function drawFurniture() {
   // toy room: shelf
   drawShelf(660, 452, 58, 96, ['#ff5d8f', '#ffd93d', '#4dc3ff', '#ff9f68']);
 }
+function drawFlower(f, t) {
+  ctx.save(); ctx.translate(f.x, f.y);
+  ctx.fillStyle = '#c96f4a'; // pot
+  ctx.beginPath(); ctx.moveTo(-8, 4); ctx.lineTo(8, 4); ctx.lineTo(6, 14); ctx.lineTo(-6, 14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a85638'; ctx.fillRect(-9, 1, 18, 5);
+  ctx.strokeStyle = f.watered ? '#3f9e4d' : '#8a9a5b'; ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.moveTo(0, 2);
+  ctx.quadraticCurveTo(f.watered ? 2 : 5, -6, f.watered ? 0 : 6, f.watered ? -13 : -9); ctx.stroke();
+  const hx = f.watered ? 0 : 6, hy = f.watered ? -16 : -11;
+  if (f.watered) {
+    ctx.fillStyle = f.color;
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3 + Math.sin(t / 700 + f.x) * 0.06;
+      ctx.beginPath(); ctx.ellipse(hx + Math.cos(a) * 5.4, hy + Math.sin(a) * 5.4, 3.8, 3.8, 0, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = '#fff3b0';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.4, 0, 7); ctx.fill();
+  } else {
+    ctx.fillStyle = '#b9bfae';
+    ctx.beginPath(); ctx.arc(hx, hy, 4.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#9aa58f';
+    ctx.beginPath(); ctx.arc(hx - 1.4, hy - 1, 1.6, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
 
-// ---------- characters ----------
+// ---------- squishies & NeeDohs ----------
+function starPath(r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 ? r * 0.55 : r, a = i * Math.PI / 5 - Math.PI / 2;
+    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rad, Math.sin(a) * rad);
+  }
+  ctx.closePath();
+}
+function heartPath(r) {
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.85);
+  ctx.bezierCurveTo(-r * 1.25, 0, -r * 0.72, -r, 0, -r * 0.42);
+  ctx.bezierCurveTo(r * 0.72, -r, r * 1.25, 0, 0, r * 0.85);
+  ctx.closePath();
+}
+function drawSquishy(s, t) {
+  const squash = 1 + Math.sin(t / 480 + s.x) * 0.06;
+  ctx.save(); ctx.translate(s.x, s.y); ctx.scale(1, squash);
+  ctx.fillStyle = 'rgba(90,40,60,.14)';
+  ctx.beginPath(); ctx.ellipse(0, 12 / squash, 13, 4, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = s.color; ctx.strokeStyle = 'rgba(120,60,90,.35)'; ctx.lineWidth = 1.6;
+  const r = 13;
+  if (s.shape === 'star') { starPath(r + 2); ctx.fill(); ctx.stroke(); }
+  else if (s.shape === 'heart') { heartPath(r); ctx.fill(); ctx.stroke(); }
+  else if (s.shape === 'bear') {
+    ctx.beginPath(); ctx.arc(-8, -9, 5.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(8, -9, 5.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 11.5, 0, 7); ctx.fill(); ctx.stroke();
+  } else if (s.shape === 'bunny') {
+    ctx.beginPath(); ctx.ellipse(-5, -14, 3.6, 8, -0.15, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(5, -14, 3.6, 8, 0.15, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 1, 10.5, 0, 7); ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(-7, 3, 7, 0, 7); ctx.arc(0, -3, 9, 0, 7); ctx.arc(8, 3, 7, 0, 7); ctx.arc(0, 5, 8, 0, 7);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = '#4a2b3a';
+  ctx.beginPath(); ctx.arc(-3.4, -1, 1.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.4, -1, 1.3, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.arc(0, 1.6, 2.6, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.restore();
+  drawTwinkle(s.x, s.y, t);
+}
+function shade(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, (n >> 16) - 45), g = Math.max(0, ((n >> 8) & 255) - 45), b = Math.max(0, (n & 255) - 45);
+  return `rgb(${r},${g},${b})`;
+}
+function drawNeedoh(n, t) {
+  ctx.save(); ctx.translate(n.x, n.y + Math.sin(t / 500 + n.x) * 1.2);
+  ctx.fillStyle = 'rgba(90,40,60,.14)';
+  ctx.beginPath(); ctx.ellipse(0, 10, 11, 3.6, 0, 0, 7); ctx.fill();
+  const g = ctx.createRadialGradient(-4, -5, 2, 0, 0, 13);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.25, n.color); g.addColorStop(1, shade(n.color));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.beginPath(); ctx.ellipse(-4.5, -5.5, 3.4, 2.2, -0.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4a2b3a';
+  ctx.beginPath(); ctx.arc(-3, 0.5, 1.2, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3, 0.5, 1.2, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 3, 2.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.restore();
+  drawTwinkle(n.x, n.y, t);
+}
+function drawTwinkle(x, y, t) {
+  const p = ((t / 700) + x * 0.01) % 1;
+  ctx.save(); ctx.translate(x + 14, y - 14); ctx.rotate(p * 1.2);
+  ctx.globalAlpha = Math.sin(p * Math.PI) * 0.9;
+  ctx.fillStyle = '#ffcf3f';
+  const s = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, -s); ctx.lineTo(1.6, -1.6); ctx.lineTo(s, 0); ctx.lineTo(1.6, 1.6);
+  ctx.lineTo(0, s); ctx.lineTo(-1.6, 1.6); ctx.lineTo(-s, 0); ctx.lineTo(-1.6, -1.6);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// ---------- characters (drawn with shading, shine & little details) ----------
 function drawGirl(g, t) {
   const bob = g.moving ? Math.sin(t / 90) * 2.2 : Math.sin(t / 600) * 0.8;
   const y = g.y + bob, flip = g.face < 0 ? -1 : 1;
   ctx.save(); ctx.translate(g.x, y);
-  // shadow
   ctx.fillStyle = 'rgba(90,40,60,.18)';
   ctx.beginPath(); ctx.ellipse(0, 26 - bob, 15, 5, 0, 0, 7); ctx.fill();
-  // legs + shoes
   const step = g.moving ? Math.sin(t / 90) * 5 : 0;
   ctx.fillStyle = g.skin;
   ctx.fillRect(-8, 14, 6, 11 + step * 0.4); ctx.fillRect(2, 14, 6, 11 - step * 0.4);
   ctx.fillStyle = '#fff';
   rr(-10, 23 + step * 0.4, 10, 6, 3); ctx.fill(); rr(0, 23 - step * 0.4, 10, 6, 3); ctx.fill();
-  // dress with soft shading
+  ctx.fillStyle = g.dressDark; // shoe bows
+  ctx.beginPath(); ctx.arc(-5, 23 + step * 0.4, 1.8, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(5, 23 - step * 0.4, 1.8, 0, 7); ctx.fill();
+  // dress: gradient, polka dots, scalloped hem
   const grad = ctx.createLinearGradient(0, -12, 0, 18);
   grad.addColorStop(0, g.dress); grad.addColorStop(1, g.dressDark);
   ctx.fillStyle = grad;
@@ -390,79 +599,107 @@ function drawGirl(g, t) {
   ctx.moveTo(-6, -12); ctx.lineTo(6, -12);
   ctx.quadraticCurveTo(14, 6, 17, 17); ctx.lineTo(-17, 17);
   ctx.quadraticCurveTo(-14, 6, -6, -12); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-6, -13, 12, 4); // collar
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  [[-8, 4], [0, 8], [8, 3], [-4, 13], [6, 13]].forEach(([dx, dy]) => {
+    ctx.beginPath(); ctx.arc(dx, dy, 2, 0, 7); ctx.fill();
+  });
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(-12 + i * 6, 17, 3, Math.PI, 0); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(-6, -13, 12, 4);
   // arms
   ctx.strokeStyle = g.skin; ctx.lineWidth = 5.5; ctx.lineCap = 'round';
   const wave = g.waving ? Math.sin(t / 120) * 6 : 0;
   ctx.beginPath(); ctx.moveTo(-7, -8); ctx.lineTo(-14, 4 + step * 0.3); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(7, -8); ctx.lineTo(14, g.waving ? -12 + wave : 4 - step * 0.3); ctx.stroke();
-  // hair behind head (Leah: long)
+  // Leah's long hair behind
   if (g.longHair) {
     ctx.fillStyle = g.hair;
     rr(-14, -34, 7, 34, 3.5); ctx.fill(); rr(7, -34, 7, 34, 3.5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.22)';
+    rr(-12.4, -30, 2.2, 26, 1); ctx.fill();
   }
-  // head
+  // ears
+  ctx.fillStyle = g.skin;
+  ctx.beginPath(); ctx.arc(-14.4, -22, 3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(14.4, -22, 3, 0, 7); ctx.fill();
+  // head with soft skin shading
   const skinGrad = ctx.createRadialGradient(-4, -26, 3, 0, -24, 17);
-  skinGrad.addColorStop(0, '#ffe9d6'); skinGrad.addColorStop(0.45, g.skin); skinGrad.addColorStop(1, g.skinDark);
+  skinGrad.addColorStop(0, '#ffeeda'); skinGrad.addColorStop(0.45, g.skin); skinGrad.addColorStop(1, g.skinDark);
   ctx.fillStyle = skinGrad;
   ctx.beginPath(); ctx.arc(0, -24, 14.5, 0, 7); ctx.fill();
-  // hair top + Jurnie's two puffs
+  // hair + shine
   ctx.fillStyle = g.hair;
   ctx.beginPath(); ctx.arc(0, -29, 14.5, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
   ctx.fillRect(-14.5, -31, 29, 4);
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -29.5, 11.5, Math.PI * 1.18, Math.PI * 1.55); ctx.stroke();
   if (!g.longHair) {
+    ctx.fillStyle = g.hair;
     ctx.beginPath(); ctx.arc(-13, -36, 6.5, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(13, -36, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.3)';
+    ctx.beginPath(); ctx.arc(-15, -38, 2.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(11, -38, 2.2, 0, 7); ctx.fill();
     ctx.fillStyle = g.bow;
     ctx.beginPath(); ctx.arc(-13, -36, 2.6, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(13, -36, 2.6, 0, 7); ctx.fill();
   } else {
     ctx.fillStyle = g.bow;
     ctx.beginPath(); ctx.moveTo(8 * flip, -38); ctx.lineTo(15 * flip, -41); ctx.lineTo(15 * flip, -34); ctx.fill();
+    // star necklace
+    ctx.fillStyle = '#ffd93d'; ctx.font = '9px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('★', 0, -8);
+    ctx.textAlign = 'left';
   }
-  // face: big eyes, smile, blush
+  // face: big shiny eyes with lashes, smile, blush
   ctx.fillStyle = '#33222a';
   ctx.beginPath(); ctx.ellipse(-5.2, -23, 1.9, 2.7, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(5.2, -23, 1.9, 2.7, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(-5.8, -24, 0.8, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(4.6, -24, 0.8, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#33222a'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(-5.8, -24, 0.85, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(4.6, -24, 0.85, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(-4.6, -21.8, 0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(5.8, -21.8, 0.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#33222a'; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.moveTo(-7.4, -25.4); ctx.lineTo(-8.6, -26.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(7.4, -25.4); ctx.lineTo(8.6, -26.6); ctx.stroke();
+  ctx.lineWidth = 1.4;
   ctx.beginPath(); ctx.arc(0, -18.5, 4.4, Math.PI * 0.18, Math.PI * 0.82); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,120,160,.4)';
+  ctx.fillStyle = 'rgba(255,120,160,.42)';
   ctx.beginPath(); ctx.ellipse(-9.5, -19, 3.2, 2, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(9.5, -19, 3.2, 2, 0, 0, 7); ctx.fill();
   ctx.restore();
 }
 function drawCat(c, t) {
-  const wag = Math.sin(t / 220) * 0.35;
   const y = c.y + (c.moving ? Math.abs(Math.sin(t / 130)) * -1.6 : 0);
   ctx.save(); ctx.translate(c.x, y);
   ctx.fillStyle = 'rgba(90,40,60,.15)';
   ctx.beginPath(); ctx.ellipse(0, 15, 14, 4.5, 0, 0, 7); ctx.fill();
-  // tail
   ctx.strokeStyle = '#e8e2da'; ctx.lineWidth = 5; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(-13 * c.face, 8);
-  ctx.quadraticCurveTo(-24 * c.face, 2, -20 * c.face + Math.sin(t / 220) * 3, -10 + wag * 6); ctx.stroke();
-  // fluffy body
+  ctx.quadraticCurveTo(-24 * c.face, 2, -20 * c.face + Math.sin(t / 220) * 3, -10 + Math.sin(t / 220) * 2); ctx.stroke();
+  ctx.strokeStyle = '#cfc6bb'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(-19 * c.face, -2); ctx.lineTo(-23 * c.face, -5); ctx.stroke();
   ctx.fillStyle = '#f4efe8';
   ctx.beginPath(); ctx.ellipse(0, 5, 16, 11, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#ddd5cc';
-  ctx.beginPath(); ctx.ellipse(-4, 1, 8, 6, -0.4, 0, 7); ctx.fill(); // grey patch
-  // paws
+  ctx.beginPath(); ctx.ellipse(-4, 1, 8, 6, -0.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3, 7, 6, 4.4, 0.3, 0, 7); ctx.fill();
+  // collar + bell
+  ctx.strokeStyle = '#ff5d8f'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(10 * c.face, -6, 9.4, Math.PI * 0.25, Math.PI * 0.75); ctx.stroke();
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath(); ctx.arc(10 * c.face, 2.6, 2.4, 0, 7); ctx.fill();
   ctx.fillStyle = '#f4efe8';
   ctx.beginPath(); ctx.ellipse(-7, 14, 4.5, 3, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(7, 14, 4.5, 3, 0, 0, 7); ctx.fill();
-  // head
   ctx.fillStyle = '#f4efe8';
   ctx.beginPath(); ctx.arc(10 * c.face, -6, 10, 0, 7); ctx.fill();
-  // ears
   ctx.fillStyle = '#f4efe8';
   ctx.beginPath(); ctx.moveTo(3 * c.face, -13); ctx.lineTo(6 * c.face, -20); ctx.lineTo(10 * c.face, -14); ctx.fill();
   ctx.beginPath(); ctx.moveTo(12 * c.face, -14); ctx.lineTo(17 * c.face, -19); ctx.lineTo(18 * c.face, -11); ctx.fill();
   ctx.fillStyle = '#ffb3c8';
   ctx.beginPath(); ctx.moveTo(5.4 * c.face, -14.4); ctx.lineTo(6.6 * c.face, -17.4); ctx.lineTo(8.6 * c.face, -13.8); ctx.fill();
-  // face
   ctx.fillStyle = '#33222a';
   const blink = (t % 3400) < 130 ? 0.4 : 2.2;
   ctx.beginPath(); ctx.ellipse(6.5 * c.face, -6, 1.4, blink, 0, 0, 7); ctx.fill();
@@ -473,9 +710,30 @@ function drawCat(c, t) {
   for (const s of [-1, 1]) for (let i = 0; i < 2; i++) {
     ctx.beginPath();
     ctx.moveTo(16 * c.face, -4 + i * 2.4);
-    ctx.lineTo((16 + 6 * s * 0 + 6) * c.face, -6 + i * 3.2);
+    ctx.lineTo(22 * c.face, -6 + i * 3.2);
     ctx.stroke();
   }
+  ctx.restore();
+}
+function drawButterfly(b, t) {
+  const bx = b.landed ? jurnie.x + 11 : b.x;
+  const by = b.landed ? jurnie.y - 47 + Math.sin(t / 300) * 1.4 : b.y + Math.sin(t / 260 + b.phase) * 3;
+  ctx.save(); ctx.translate(bx, by);
+  ctx.fillStyle = 'rgba(90,40,60,.12)';
+  if (!b.landed) { ctx.beginPath(); ctx.ellipse(0, 16, 6, 2, 0, 0, 7); ctx.fill(); }
+  const flap = b.landed ? 0.55 + Math.sin(t / 500) * 0.1 : Math.abs(Math.sin(t / 90 + b.phase)) * 0.8 + 0.15;
+  ctx.fillStyle = b.color;
+  for (const s of [-1, 1]) {
+    ctx.save(); ctx.scale(s * flap, 1);
+    ctx.beginPath(); ctx.ellipse(6, -2, 6.4, 4.4, -0.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(5, 3.4, 4.6, 3.4, 0.5, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = '#4a2b3a';
+  ctx.beginPath(); ctx.ellipse(0, 0, 1.8, 4.6, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.moveTo(-1, -4); ctx.quadraticCurveTo(-4, -8, -6, -8.4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(1, -4); ctx.quadraticCurveTo(4, -8, 6, -8.4); ctx.stroke();
   ctx.restore();
 }
 
@@ -486,13 +744,34 @@ const leah = { x: 420, y: 120, face: -1, moving: false, waving: false, longHair:
   skin: '#f7cfae', skinDark: '#e8b98d', hair: '#2e1c10', dress: '#9d7bff', dressDark: '#7f5fe0', bow: '#ff8fab' };
 const fancy = { x: 260, y: 420, face: 1, moving: false, tx: 260, ty: 420, wait: 0 };
 
-// ---------- speech bubbles & talking ----------
-const bubbles = []; // {who, text, until}
+// ---------- particles (hearts, stars, splashes) ----------
+const particles = [];
+function spawnParticles(x, y, emoji, n = 6, spread = 26) {
+  for (let i = 0; i < n; i++) {
+    particles.push({ x: x + (Math.random() - .5) * spread, y: y + (Math.random() - .5) * 10,
+      vy: -0.5 - Math.random() * 0.7, vx: (Math.random() - .5) * 0.5,
+      life: 1, emoji, size: 11 + Math.random() * 7 });
+  }
+}
+function drawParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.life -= dt / 1400;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.font = p.size + 'px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(p.emoji, p.x, p.y);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+}
+
+// ---------- speech bubbles ----------
+const bubbles = [];
 function showBubble(who, text, ms = 3400) {
   bubbles.length = 0;
   bubbles.push({ who, text, until: performance.now() + ms });
 }
-function drawBubble(b, t) {
+function drawBubble(b) {
   const who = b.who;
   const bx = who.x, by = who.y - 62;
   ctx.font = '600 13.5px system-ui';
@@ -518,6 +797,7 @@ function drawBubble(b, t) {
   ctx.textAlign = 'left';
 }
 
+// ---------- talk lines ----------
 const leahLines = [
   "Hi Jurnie! I'm so glad you're here!",
   "L is for Leah — and for LOVE!",
@@ -536,142 +816,169 @@ const fancyLines = [
   "Mrrrow! (Follow me, Jurnie!)",
   "Purr purr purr… happy cat!",
 ];
-const jurnieLines = [
-  "I love my house!",
-  "Where are the squishies hiding?",
-  "Leah is the best big sister!",
-  "Fancy is so fluffy!",
+const stories = [
+  ["Once there was a tiny star who lost her sparkle…", "Her friends shared theirs, and she shone brighter than ever! ⭐"],
+  ["A little seed slept under the warm earth…", "Rain tickled her, sun kissed her — and POP! A flower! 🌸"],
+  ["Fancy the cat found a mysterious box…", "Inside was the comfiest nap in the whole world. 🐱💤"],
 ];
-let leahIdx = 0, fancyIdx = 0, jurnieIdx = 0;
-function tryInteract() {
-  if (!started || won) return;
-  const dL = Math.hypot(jurnie.x - leah.x, jurnie.y - leah.y);
-  const dF = Math.hypot(jurnie.x - fancy.x, jurnie.y - fancy.y);
-  if (dL < 64) {
-    const line = leahLines[leahIdx++ % leahLines.length];
-    leah.waving = true; setTimeout(() => leah.waving = false, 1600);
-    leah.face = jurnie.x >= leah.x ? 1 : -1;
-    showBubble(leah, line); speak(line, 1.15);
-  } else if (dF < 56) {
-    const line = fancyLines[fancyIdx++ % fancyLines.length];
-    showBubble(fancy, line);
-    if (talkOn) { meowSound(); setTimeout(() => speak(line, 1.6), 350); }
-    else meowSound();
-  }
-}
+const towerLines = ["One block! Great start!", "Two blocks! Growing tall!", "Three blocks! Tower power! 🧱", "So tall! Careful…", "Wow, a sky tower!", "The tallest tower ever! 🏰"];
+let leahIdx = 0, fancyIdx = 0, storyIdx = 0;
 
-// ---------- squishies & NeeDohs ----------
-function star(r) {
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const rad = i % 2 ? r * 0.55 : r, a = i * Math.PI / 5 - Math.PI / 2;
-    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rad, Math.sin(a) * rad);
-  }
-  ctx.closePath();
-}
-function heart(r) {
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.85);
-  ctx.bezierCurveTo(-r * 1.25, 0, -r * 0.72, -r, 0, -r * 0.42);
-  ctx.bezierCurveTo(r * 0.72, -r, r * 1.25, 0, 0, r * 0.85);
-  ctx.closePath();
-}
-function drawSquishy(s, t) {
-  const squash = 1 + Math.sin(t / 480 + s.x) * 0.06;
-  ctx.save(); ctx.translate(s.x, s.y); ctx.scale(1, squash);
-  ctx.fillStyle = 'rgba(90,40,60,.14)';
-  ctx.beginPath(); ctx.ellipse(0, 12 / squash, 13, 4, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = s.color; ctx.strokeStyle = 'rgba(120,60,90,.35)'; ctx.lineWidth = 1.6;
-  const r = 13;
-  if (s.shape === 'star') { star(r + 2); ctx.fill(); ctx.stroke(); }
-  else if (s.shape === 'heart') { heart(r); ctx.fill(); ctx.stroke(); }
-  else if (s.shape === 'bear') {
-    ctx.beginPath(); ctx.arc(-8, -9, 5.5, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(8, -9, 5.5, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(0, 0, 11.5, 0, 7); ctx.fill(); ctx.stroke();
-  } else if (s.shape === 'bunny') {
-    ctx.beginPath(); ctx.ellipse(-5, -14, 3.6, 8, -0.15, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(5, -14, 3.6, 8, 0.15, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(0, 1, 10.5, 0, 7); ctx.fill(); ctx.stroke();
-  } else { // cloud
-    ctx.beginPath();
-    ctx.arc(-7, 3, 7, 0, 7); ctx.arc(0, -3, 9, 0, 7); ctx.arc(8, 3, 7, 0, 7); ctx.arc(0, 5, 8, 0, 7);
-    ctx.fill(); ctx.stroke();
-  }
-  // cute face
-  ctx.fillStyle = '#4a2b3a';
-  ctx.beginPath(); ctx.arc(-3.4, -1, 1.3, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(3.4, -1, 1.3, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 1.1;
-  ctx.beginPath(); ctx.arc(0, 1.6, 2.6, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
-  ctx.restore();
-  drawTwinkle(s.x, s.y, t);
-}
-function drawNeedoh(n, t) {
-  ctx.save(); ctx.translate(n.x, n.y + Math.sin(t / 500 + n.x) * 1.2);
-  ctx.fillStyle = 'rgba(90,40,60,.14)';
-  ctx.beginPath(); ctx.ellipse(0, 10, 11, 3.6, 0, 0, 7); ctx.fill();
-  const g = ctx.createRadialGradient(-4, -5, 2, 0, 0, 13);
-  g.addColorStop(0, '#ffffff'); g.addColorStop(0.25, n.color); g.addColorStop(1, shade(n.color));
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.75)';
-  ctx.beginPath(); ctx.ellipse(-4.5, -5.5, 3.4, 2.2, -0.6, 0, 7); ctx.fill();
-  ctx.fillStyle = '#4a2b3a';
-  ctx.beginPath(); ctx.arc(-3, 0.5, 1.2, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(3, 0.5, 1.2, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#4a2b3a'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(0, 3, 2.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
-  ctx.restore();
-  drawTwinkle(n.x, n.y, t);
-}
-function shade(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.max(0, (n >> 16) - 45), g = Math.max(0, ((n >> 8) & 255) - 45), b = Math.max(0, (n & 255) - 45);
-  return `rgb(${r},${g},${b})`;
-}
-function drawTwinkle(x, y, t) {
-  const p = ((t / 700) + x * 0.01) % 1;
-  ctx.save(); ctx.translate(x + 14, y - 14); ctx.rotate(p * 1.2);
-  ctx.globalAlpha = Math.sin(p * Math.PI) * 0.9;
-  ctx.fillStyle = '#ffcf3f';
-  const s = 5;
-  ctx.beginPath();
-  ctx.moveTo(0, -s); ctx.lineTo(1.6, -1.6); ctx.lineTo(s, 0); ctx.lineTo(1.6, 1.6);
-  ctx.lineTo(0, s); ctx.lineTo(-1.6, 1.6); ctx.lineTo(-s, 0); ctx.lineTo(-1.6, -1.6);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
+// ---------- play state for missions ----------
+const talks = { leah: 0, fancy: 0 };
+const roomsVisited = new Set();
+let snackDone = false, storyDone = false, towerBlocks = 0;
+let stars = 0, superWon = false;
 
-// ---------- confetti for the big win ----------
-const confetti = [];
-function burstConfetti() {
-  const colors = ['#ff5d8f', '#ffd93d', '#4dc3ff', '#7be495', '#b98cff', '#ff9f68'];
-  for (let i = 0; i < 130; i++) {
-    confetti.push({ x: Math.random() * W, y: -20 - Math.random() * 160,
-      vx: (Math.random() - 0.5) * 1.4, vy: 1.4 + Math.random() * 2.2,
-      s: 4 + Math.random() * 5, c: colors[i % colors.length], rot: Math.random() * 7, vr: (Math.random() - .5) * .2 });
-  }
-}
-function drawConfetti(dt) {
-  for (const p of confetti) {
-    p.x += p.vx; p.y += p.vy; p.rot += p.vr;
-    if (p.y > H + 20) p.y = -20;
-    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-    ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.62);
-    ctx.restore();
-  }
-}
-
-// ---------- game logic ----------
+// ---------- missions & objectives ----------
+const missions = [
+  { icon: '👋', text: 'Say hello to Leah', prog: () => talks.leah, total: 1, done: false },
+  { icon: '🐱', text: 'Pet Fancy the cat', prog: () => talks.fancy, total: 1, done: false },
+  { icon: '🍎', text: 'Have a snack in the Kitchen', prog: () => snackDone ? 1 : 0, total: 1, done: false },
+  { icon: '🧱', text: 'Build a tower of 3 blocks in the Play Room', prog: () => towerBlocks, total: 3, done: false },
+  { icon: '🗺️', text: 'Visit all 9 rooms', prog: () => roomsVisited.size, total: 9, done: false },
+  { icon: '🌸', text: 'Water the 5 flowers in the Garden Room', prog: () => flowersWatered, total: 5, done: false },
+  { icon: '📖', text: 'Read a story in the Story Corner', prog: () => storyDone ? 1 : 0, total: 1, done: false },
+  { icon: '🦋', text: 'Make friends with a butterfly', prog: () => butterflyFriend ? 1 : 0, total: 1, done: false },
+  { icon: '🧸', text: 'Find 5 squishies', prog: () => sqFound, total: 5, done: false },
+  { icon: '🫧', text: 'Find 3 NeeDohs', prog: () => ndFound, total: 3, done: false },
+  { icon: '🌟', text: 'Find ALL 10 squishies', prog: () => sqFound, total: 10, done: false },
+  { icon: '🌟', text: 'Find ALL 8 NeeDohs', prog: () => ndFound, total: 8, done: false },
+];
 const sqEl = document.getElementById('sqCount'), ndEl = document.getElementById('ndCount');
+const starEl = document.getElementById('starCount'), missionTextEl = document.getElementById('missionText');
 const toast = document.getElementById('roomToast'), talkBtn = document.getElementById('talkBtn');
-let curRoom = -1, toastTimer = null;
+const questPanel = document.getElementById('questPanel'), questList = document.getElementById('questList');
+let toastTimer = null;
+function showToast(text, ms = 1700) {
+  toast.textContent = text; toast.style.opacity = 1;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.style.opacity = 0, ms);
+}
 function updateHUD() { sqEl.textContent = sqFound + '/10'; ndEl.textContent = ndFound + '/8'; }
+function renderQuests() {
+  questList.innerHTML = missions.map(m =>
+    `<li class="${m.done ? 'done' : ''}">${m.icon} <span class="txt">${m.text}</span><span class="st">${m.done ? '✓' : Math.min(m.prog(), m.total) + '/' + m.total}</span></li>`
+  ).join('');
+}
+function updateMissionUI() {
+  starEl.textContent = stars + '/12';
+  const cur = missions.find(m => !m.done);
+  missionTextEl.textContent = cur ? `${cur.text} (${Math.min(cur.prog(), cur.total)}/${cur.total})` : 'All missions done — Super Explorer! 🏆';
+  renderQuests();
+}
+function toggleQuests() { questPanel.classList.toggle('open'); renderQuests(); }
+document.getElementById('questBtn').addEventListener('click', toggleQuests);
+function checkMissions() {
+  for (const m of missions) {
+    if (!m.done && m.prog() >= m.total) {
+      m.done = true; stars++;
+      chimeSound();
+      spawnParticles(jurnie.x, jurnie.y - 34, '⭐', 7, 40);
+      showToast('⭐ Mission complete: ' + m.text, 2400);
+      updateMissionUI();
+    }
+  }
+  if (!superWon && missions.every(m => m.done)) {
+    superWon = true;
+    burstConfetti(); burstConfetti();
+    leah.waving = true;
+    showBubble(leah, '🏆 Jurnie is a SUPER EXPLORER! Every mission done!', 6000);
+    speak('Jurnie is a super explorer! Every mission done!', 1.2);
+  }
+}
+
+// ---------- interacting ----------
+function speakStory(text, pitch) {
+  if (!talkOn || !('speechSynthesis' in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = pitch; u.rate = 1.0; u.lang = 'en-US';
+    speechSynthesis.speak(u);
+  } catch (e) { /* ignore */ }
+}
+function talkLeah() {
+  const line = leahLines[leahIdx++ % leahLines.length];
+  talks.leah++;
+  leah.waving = true; setTimeout(() => leah.waving = false, 1600);
+  leah.face = jurnie.x >= leah.x ? 1 : -1;
+  showBubble(leah, line); speak(line, 1.15);
+  checkMissions();
+}
+function petFancy() {
+  const line = fancyLines[fancyIdx++ % fancyLines.length];
+  talks.fancy++;
+  fancy.face = jurnie.x >= fancy.x ? 1 : -1;
+  showBubble(fancy, line);
+  spawnParticles(fancy.x, fancy.y - 16, '💗', 5, 22);
+  meowSound();
+  if (talkOn) setTimeout(() => speak(line, 1.6), 350);
+  checkMissions();
+}
+function waterFlower(f) {
+  f.watered = true; flowersWatered++;
+  splashSound();
+  spawnParticles(f.x, f.y - 12, '💧', 6, 20);
+  spawnParticles(f.x, f.y - 18, '🌸', 3, 16);
+  showBubble(jurnie, 'Splash! Pretty flower! 🌸', 2000);
+  speak('Splash! Pretty flower!', 1.45);
+  checkMissions();
+}
+function addBlock() {
+  if (towerBlocks >= 6) { showBubble(jurnie, "It's the tallest tower ever! 🏰", 2000); return; }
+  towerBlocks++;
+  popSound();
+  spawnParticles(530, 420 - towerBlocks * 17, '🧱', 3, 18);
+  const line = towerLines[towerBlocks - 1];
+  showBubble(jurnie, line, 2000); speak(line, 1.45);
+  checkMissions();
+}
+function doSnack() {
+  if (!snackDone) {
+    snackDone = true;
+    sparkleSound();
+    spawnParticles(jurnie.x, jurnie.y - 20, '💗', 5, 24);
+    showBubble(jurnie, 'Yum! Apple snack! 🍎', 2200);
+    speak('Yum! Apple snack!', 1.45);
+    checkMissions();
+  } else {
+    showBubble(jurnie, 'That snack was yummy!', 1800);
+  }
+}
+function readStory() {
+  const [l1, l2] = stories[storyIdx++ % stories.length];
+  storyDone = true;
+  showBubble(jurnie, '📖 ' + l1, 3000);
+  if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
+  speakStory(l1, 1.3);
+  setTimeout(() => { showBubble(jurnie, '📖 ' + l2, 3200); speakStory(l2, 1.3); }, 3100);
+  checkMissions();
+}
+function interactTargets() {
+  const list = [];
+  list.push({ d: Math.hypot(jurnie.x - leah.x, jurnie.y - leah.y), r: 64, fn: talkLeah });
+  list.push({ d: Math.hypot(jurnie.x - fancy.x, jurnie.y - fancy.y), r: 56, fn: petFancy });
+  for (const f of flowers) if (!f.watered)
+    list.push({ d: Math.hypot(jurnie.x - f.x, jurnie.y - f.y), r: 44, fn: () => waterFlower(f) });
+  list.push({ d: Math.hypot(jurnie.x - 475, jurnie.y - 392), r: 58, fn: addBlock });
+  list.push({ d: Math.hypot(jurnie.x - 796, jurnie.y - 139), r: 58, fn: doSnack });
+  list.push({ d: Math.hypot(jurnie.x - 120, jurnie.y - 470), r: 64, fn: readStory });
+  return list;
+}
+function tryInteract() {
+  if (!started) return;
+  const near = interactTargets().filter(t => t.d < t.r).sort((a, b) => (a.d - a.r) - (b.d - b.r));
+  if (near.length) near[0].fn();
+}
+function nearInteract() {
+  return interactTargets().some(t => t.d < t.r);
+}
+
+// ---------- pickups & the big wins ----------
 function checkPickups() {
   for (const s of squishies) {
     if (!s.found && Math.hypot(jurnie.x - s.x, jurnie.y - s.y) < 26) {
       s.found = true; sqFound++; updateHUD(); popSound();
+      spawnParticles(s.x, s.y - 10, '🧸', 3, 18);
       showBubble(jurnie, 'Found a squishy! 🧸', 1800);
       if (!won) speak('Found a squishy!', 1.45);
     }
@@ -679,6 +986,7 @@ function checkPickups() {
   for (const n of needohs) {
     if (!n.found && Math.hypot(jurnie.x - n.x, jurnie.y - n.y) < 26) {
       n.found = true; ndFound++; updateHUD(); sparkleSound();
+      spawnParticles(n.x, n.y - 10, '🫧', 3, 18);
       showBubble(jurnie, 'Found a NeeDoh! 🫧', 1800);
       if (!won) speak('Found a NeeDoh!', 1.45);
     }
@@ -690,7 +998,28 @@ function checkPickups() {
     speak('You found them all! Amazing, Jurnie!', 1.2);
     [523, 659, 784, 1046].forEach((f, i) => beep(f, .22, 'triangle', .14, i * .13));
   }
+  checkMissions();
 }
+const confetti = [];
+function burstConfetti() {
+  const colors = ['#ff5d8f', '#ffd93d', '#4dc3ff', '#7be495', '#b98cff', '#ff9f68'];
+  for (let i = 0; i < 130; i++) {
+    confetti.push({ x: Math.random() * W, y: -20 - Math.random() * 160,
+      vx: (Math.random() - 0.5) * 1.4, vy: 1.4 + Math.random() * 2.2,
+      s: 4 + Math.random() * 5, c: colors[i % colors.length], rot: Math.random() * 7, vr: (Math.random() - .5) * .2 });
+  }
+}
+function drawConfetti() {
+  for (const p of confetti) {
+    p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    if (p.y > H + 20) p.y = -20;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+    ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.62);
+    ctx.restore();
+  }
+}
+
+// ---------- movement & NPC life ----------
 function updateFancy(dt) {
   fancy.wait -= dt;
   const dx = fancy.tx - fancy.x, dy = fancy.ty - fancy.y;
@@ -707,14 +1036,38 @@ function updateFancy(dt) {
     fancy.face = dx >= 0 ? 1 : -1;
     const sp = 0.055 * dt;
     moveActor(fancy, dx / d * sp, dy / d * sp, 10);
-    if (fancy.wait <= 0) { // pick a new wander target now and then (also unsticks her)
+    if (fancy.wait <= 0) {
       fancy.tx = 40 + Math.random() * (W - 80);
       fancy.ty = 50 + Math.random() * (H - 90);
       fancy.wait = 2200 + Math.random() * 2600;
     }
   }
 }
-let lastRoomCheck = 0;
+function updateButterflies(dt, now) {
+  for (const b of butterflies) {
+    if (b.landed) {
+      if (now > b.landUntil) { b.landed = false; b.tx = 380 + Math.random() * 220; b.ty = 460 + Math.random() * 150; }
+      continue;
+    }
+    const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy);
+    if (d < 8) { b.tx = 345 + Math.random() * 260; b.ty = 450 + Math.random() * 160; }
+    else { const sp = 0.045 * dt; b.x += dx / d * sp; b.y += dy / d * sp; }
+    if (!butterflyFriend && started && !jurnie.moving &&
+        Math.hypot(jurnie.x - b.x, jurnie.y - b.y) < 38) {
+      butterflyNearTime += dt;
+      if (butterflyNearTime > 1100) {
+        b.landed = true; b.landUntil = now + 4500;
+        butterflyFriend = true; butterflyNearTime = 0;
+        spawnParticles(jurnie.x, jurnie.y - 40, '💗', 6, 26);
+        showBubble(jurnie, 'A butterfly friend! 🦋', 2600);
+        speak('A butterfly friend!', 1.45);
+        checkMissions();
+      }
+    }
+  }
+  if (jurnie.moving || !started) butterflyNearTime = Math.max(0, butterflyNearTime - dt * 2);
+}
+let curRoom = -1;
 function updatePlayer(dt) {
   let dx = 0, dy = 0;
   if (keys['a'] || keys['arrowleft']) dx -= 1;
@@ -730,14 +1083,26 @@ function updatePlayer(dt) {
     moveActor(jurnie, dx / Math.max(1, m) * sp, dy / Math.max(1, m) * sp, 12);
   }
   const r = roomAt(jurnie.x, jurnie.y);
-  if (r !== curRoom && performance.now() - lastRoomCheck > 300) {
+  if (r !== curRoom) {
     curRoom = r;
-    toast.textContent = roomNames[r]; toast.style.opacity = 1;
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.style.opacity = 0, 1600);
+    roomsVisited.add(r);
+    showToast(roomNames[r]);
+    checkMissions();
   }
-  const near = Math.hypot(jurnie.x - leah.x, jurnie.y - leah.y) < 64 ||
-               Math.hypot(jurnie.x - fancy.x, jurnie.y - fancy.y) < 56;
-  talkBtn.classList.toggle('ready', near && started && !won);
+  talkBtn.classList.toggle('ready', nearInteract() && started);
+}
+function drawTower() {
+  const colors = ['#ff5d8f', '#ffd93d', '#4dc3ff', '#7be495', '#b98cff', '#ff9f68'];
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+  for (let i = 0; i < towerBlocks; i++) {
+    const bx = 528 + ((i % 2) * 4 - 2), by = 424 - i * 17;
+    ctx.fillStyle = colors[i];
+    rr(bx, by, 19, 16, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.font = '800 10.5px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(letters[i], bx + 9.5, by + 12.5);
+    ctx.textAlign = 'left';
+  }
 }
 
 // ---------- main loop ----------
@@ -745,34 +1110,37 @@ let lastT = performance.now();
 function frame(now) {
   const dt = Math.min(50, now - lastT); lastT = now;
   ctx.clearRect(0, 0, W, H);
-  drawHouse();
+  drawHouse(now);
+  for (const f of flowers) drawFlower(f, now);
+  drawTower();
   for (const s of squishies) if (!s.found) drawSquishy(s, now);
   for (const n of needohs) if (!n.found) drawNeedoh(n, now);
   if (started) {
-    updatePlayer(dt); updateFancy(dt); checkPickups();
+    updatePlayer(dt); updateFancy(dt); updateButterflies(dt, now); checkPickups();
   }
-  // draw actors sorted by y so nearer ones overlap right
   const actors = [
     { y: fancy.y, draw: () => drawCat(fancy, now) },
     { y: leah.y, draw: () => drawGirl(leah, now) },
     { y: jurnie.y, draw: () => drawGirl(jurnie, now) },
   ].sort((a, b) => a.y - b.y);
   for (const a of actors) a.draw();
-  // bubbles
-  if (bubbles.length && now < bubbles[0].until) drawBubble(bubbles[0], now);
+  for (const b of butterflies) drawButterfly(b, now);
+  drawParticles(dt);
+  if (bubbles.length && now < bubbles[0].until) drawBubble(bubbles[0]);
   else bubbles.length = 0;
-  if (won) {
-    drawConfetti(dt);
+  if (won || superWon) {
+    drawConfetti();
     ctx.fillStyle = 'rgba(255,255,255,.92)';
     ctx.strokeStyle = '#f3b8d2'; ctx.lineWidth = 3;
-    rr(W / 2 - 235, 66, 470, 58, 18); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#d63384'; ctx.font = '800 25px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText('🎉 You found ALL the squishies & NeeDohs! 🎉', W / 2, 103);
+    rr(W / 2 - 245, 64, 490, 56, 18); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d63384'; ctx.font = '800 24px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(superWon ? '🏆 SUPER EXPLORER — every mission done! 🏆' : '🎉 You found ALL the squishies & NeeDohs! 🎉', W / 2, 100);
     ctx.textAlign = 'left';
   }
   requestAnimationFrame(frame);
 }
 updateHUD();
+updateMissionUI();
 requestAnimationFrame(frame);
 </script>
 </body>
