@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JurnieGo 3D — Find the Squishies &amp; NeeDohs!</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; font-family: 'Baloo 2', 'Comic Sans MS', system-ui, sans-serif; background: #2b1a3d; }
+  main { display: flex; flex-direction: column; height: 100%; }
+  /* ---------- HUD ---------- */
+  #hud { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; background: linear-gradient(90deg, #6a3093, #a044ff); z-index: 5; }
+  #hud .title { color: #fff; font-weight: 800; font-size: 20px; margin-right: 4px; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+  .pill { background: #fff; border-radius: 999px; padding: 6px 14px; font-size: 17px; font-weight: 700; color: #5b2a86; box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+  .pill b { color: #d6336c; }
+  #hud .spacer { flex: 1; }
+  .hbtn { min-width: 48px; min-height: 48px; border: none; border-radius: 14px; background: #ffd93d; font-size: 22px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+  .hbtn:active { transform: translateY(2px); box-shadow: none; }
+  .hbtn.off { filter: grayscale(1); opacity: .6; }
+  /* ---------- 3D stage ---------- */
+  #stage { position: relative; flex: 1; min-height: 0; }
+  #scene { position: absolute; inset: 0; }
+  #scene canvas { display: block; }
+  #roomToast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.92); color: #5b2a86; font-weight: 800; font-size: 20px; padding: 8px 22px; border-radius: 999px; opacity: 0; transition: opacity .35s; pointer-events: none; z-index: 4; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+  /* ---------- overlays ---------- */
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 10; padding: 20px; }
+  #startScreen { background: radial-gradient(circle at 50% 35%, rgba(160,68,255,.88), rgba(43,26,61,.96)); color: #fff; }
+  #startScreen h1 { font-size: clamp(40px, 9vw, 72px); font-weight: 900; letter-spacing: 1px; text-shadow: 0 4px 0 rgba(0,0,0,.3); }
+  #startScreen .sub { font-size: clamp(17px, 3.5vw, 24px); margin: 12px 0 6px; max-width: 560px; line-height: 1.35; }
+  #startScreen .tiny { font-size: 15px; opacity: .85; margin-top: 10px; }
+  .bigbtn { margin-top: 18px; min-width: 220px; min-height: 68px; border: none; border-radius: 999px; background: #ffd93d; color: #5b2a86; font-size: 30px; font-weight: 900; cursor: pointer; box-shadow: 0 6px 0 #d9a400, 0 10px 22px rgba(0,0,0,.4); font-family: inherit; }
+  .bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #d9a400; }
+  /* ---------- find pop-up ---------- */
+  #findPop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; z-index: 9; pointer-events: none; }
+  #findPop.show { display: flex; }
+  #findCard { position: relative; background: #fff; border-radius: 30px; padding: 26px 38px 22px; text-align: center; box-shadow: 0 14px 44px rgba(0,0,0,.45); border: 6px solid #ffd93d; max-width: 88vw; animation: popIn .25s ease-out; }
+  @keyframes popIn { from { transform: scale(.4) rotate(-4deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+  #findStar { font-size: 54px; line-height: 1; animation: starSpin 1.2s ease-in-out infinite alternate; }
+  @keyframes starSpin { from { transform: scale(1) rotate(-8deg); } to { transform: scale(1.18) rotate(8deg); } }
+  #findEmoji { font-size: 96px; line-height: 1.15; }
+  #findText { font-size: clamp(24px, 5.5vw, 38px); font-weight: 900; color: #5b2a86; line-height: 1.15; }
+  #findCount { font-size: 19px; font-weight: 700; color: #d6336c; margin-top: 6px; }
+  /* ---------- win screen ---------- */
+  #winScreen { display: none; background: radial-gradient(circle at 50% 35%, rgba(255,180,0,.92), rgba(120,40,160,.95)); color: #fff; }
+  #winScreen.show { display: flex; }
+  #winScreen .trophy { font-size: 110px; animation: starSpin 1s ease-in-out infinite alternate; }
+  #winScreen h1 { font-size: clamp(34px, 8vw, 60px); font-weight: 900; text-shadow: 0 4px 0 rgba(0,0,0,.3); }
+  #winScreen p { font-size: clamp(18px, 4vw, 26px); margin-top: 8px; font-weight: 700; }
+  /* ---------- joystick ---------- */
+  #stick { position: absolute; left: 22px; bottom: 22px; width: 132px; height: 132px; border-radius: 50%; background: rgba(255,255,255,.22); border: 3px solid rgba(255,255,255,.55); z-index: 6; touch-action: none; display: none; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border-radius: 50%; background: rgba(255,217,61,.95); transform: translate(-50%,-50%); box-shadow: 0 3px 8px rgba(0,0,0,.35); }
+  @media (pointer: coarse) { #stick { display: block; } }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  #nogl { display: none; position: absolute; inset: 0; background: #fff3cd; color: #664d03; z-index: 20; padding: 40px; font-size: 20px; text-align: center; }
+  #confetti { position: absolute; inset: 0; pointer-events: none; z-index: 11; }
+</style>
+</head>
+<body>
+<main role="main" aria-label="JurnieGo 3D game">
+  <div id="hud">
+    <span class="title">🦊 JurnieGo 3D</span>
+    <span class="pill">🧸 Squishies <b id="sqCount">0/10</b></span>
+    <span class="pill">🫧 NeeDohs <b id="ndCount">0/8</b></span>
+    <span class="spacer"></span>
+    <button class="hbtn" id="musicBtn" aria-label="Turn theme music on or off" title="Theme music">🎵</button>
+    <button class="hbtn" id="soundBtn" aria-label="Turn sound on or off" title="Sound">🔊</button>
+  </div>
+
+  <div id="stage">
+    <div id="scene" role="img" aria-label="JurnieGo 3D game: help Jurnie walk around her house in 3D, find the hidden squishies and NeeDohs, with her sister Leah and Fancy the cat."><span class="sr-only">JurnieGo 3D is a visual 3D game. Help Jurnie explore her house, find 10 hidden squishies and 8 NeeDohs, and become a Super Explorer.</span></div>
+    <div id="roomToast" aria-live="polite"></div>
+    <canvas id="confetti" aria-hidden="true"></canvas>
+
+    <div id="findPop" aria-live="polite">
+      <div id="findCard">
+        <div id="findStar">⭐</div>
+        <div id="findEmoji">🧸</div>
+        <div id="findText">Jurnie found one!</div>
+        <div id="findCount"></div>
+      </div>
+    </div>
+
+    <div id="stick" aria-hidden="true"><div id="knob"></div></div>
+
+    <div class="overlay" id="startScreen">
+      <h1>🌟 JurnieGo 3D 🌟</h1>
+      <p class="sub">Walk with the <b>arrow keys</b> or the <b>joystick</b>.<br>Find all the <b>squishies</b> and <b>NeeDohs</b> hiding in the house!</p>
+      <button class="bigbtn" id="playBtn" aria-label="Play JurnieGo 3D">▶ Play!</button>
+      <p class="tiny">🧸 10 squishies &nbsp;•&nbsp; 🫧 8 NeeDohs &nbsp;•&nbsp; 🐱 Fancy is waiting to say hi!</p>
+    </div>
+
+    <div class="overlay" id="winScreen">
+      <div class="trophy">🏆</div>
+      <h1>Congratulations, Jurnie!</h1>
+      <p>You found them ALL! 🎉<br>⭐ SUPER EXPLORER! ⭐</p>
+      <button class="bigbtn" id="againBtn" aria-label="Play again">▶ Play Again!</button>
+    </div>
+
+    <div id="nogl"><h2>Oh no! 😢</h2><p>This game needs WebGL to show the 3D house.<br>Please try a newer browser or phone.</p></div>
+  </div>
+</main>
+
+<!-- Jurnie's theme song goes in this file slot: put "theme.mp3" next to this page and it will play.
+     (Kc will send the real theme song later — the game runs fine without it.) -->
+<audio id="themeSong" src="theme.mp3" loop preload="auto"></audio>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ================================================================
+   JurnieGo 3D — v3
+   Third-person 3D house explorer for ages 4–7.
+   Find 10 squishies + 8 NeeDohs. Every find = big pop-up, star,
+   confetti, jingle, and the item TALKS to Jurnie.
+   Item names/shapes/colors and rooms come from JurnieGo v2.
+   ================================================================ */
+
+// ---------- item data (from v2: shapes + colors; blue NeeDoh = "Ice") ----------
+const SQUISHIES = [
+  { name: 'Sunny Star Squishy',  kind: 'star',  color: 0xffd93d, emoji: '⭐', x: -14,  z: -12 },
+  { name: 'Pink Heart Squishy',  kind: 'heart', color: 0xff8fab, emoji: '💖', x: 3,    z: -12 },
+  { name: 'Purple Bear Squishy', kind: 'bear',  color: 0xc3a6ff, emoji: '🧸', x: 15,   z: -8  },
+  { name: 'Sky Cloud Squishy',   kind: 'cloud', color: 0xaee7ff, emoji: '☁️', x: -14,  z: 2   },
+  { name: 'Pink Bunny Squishy',  kind: 'bunny', color: 0xffb3d9, emoji: '🐰', x: 3,    z: 2   },
+  { name: 'Green Star Squishy',  kind: 'star',  color: 0x9bf6a3, emoji: '⭐', x: 15,   z: -2  },
+  { name: 'Peachy Heart Squishy',kind: 'heart', color: 0xffc59e, emoji: '🧡', x: -14,  z: 12  },
+  { name: 'Blue Bear Squishy',   kind: 'bear',  color: 0x8fd8ff, emoji: '🧸', x: -3,   z: 12  },
+  { name: 'Butter Cloud Squishy',kind: 'cloud', color: 0xffe29e, emoji: '☁️', x: 15,   z: 12  },
+  { name: 'Grape Bunny Squishy', kind: 'bunny', color: 0xd0a2ff, emoji: '🐰', x: -9,   z: -2  },
+];
+const NEEDOHS = [
+  { name: 'Pink NeeDoh',   color: 0xff5d8f, emoji: '🩷', x: -9,   z: -8  },
+  { name: 'Ice NeeDoh',    color: 0x4dc3ff, emoji: '❄️', x: 9,    z: -13 },
+  { name: 'Orange NeeDoh', color: 0xffb340, emoji: '🟠', x: -15,  z: -3  },
+  { name: 'Green NeeDoh',  color: 0x7be495, emoji: '🟢', x: 3,    z: 8   },
+  { name: 'Purple NeeDoh', color: 0xb98cff, emoji: '🟣', x: 0.5,  z: -7  },
+  { name: 'Coral NeeDoh',  color: 0xff7a59, emoji: '🔴', x: 9,    z: 12  },
+  { name: 'Teal NeeDoh',   color: 0x4dd8d0, emoji: '🔵', x: -15,  z: 8   },
+  { name: 'Sunny NeeDoh',  color: 0xffd93d, emoji: '🟡', x: -3,   z: -2  },
+];
+const ROOM_NAMES = [
+  "Jurnie's Room", "Leah's Room", 'Kitchen',
+  'Living Room', 'Play Room', 'Bathroom',
+  'Story Corner', 'Garden Room', 'Toy Room'
+];
+const FLOOR_COLORS = [0xffd9e8, 0xd6ecff, 0xfff3c4, 0xffe3c2, 0xe6dcff, 0xd8f7f0, 0xffe9d6, 0xd9f7c4, 0xffdfef];
+
+// ---------- tiny helpers ----------
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+function angLerp(a, b, t) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
+// ---------- audio: jingles (WebAudio) + speech + theme slot ----------
+let audioCtx = null, soundOn = true, musicOn = true, themeDead = false;
+function ac() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* no audio */ } }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone(freq, t0, dur, type = 'sine', vol = 0.22) {
+  const ctx = ac(); if (!ctx || !soundOn) return;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.value = freq;
+  const s = ctx.currentTime + t0;
+  g.gain.setValueAtTime(0.0001, s);
+  g.gain.exponentialRampToValueAtTime(vol, s + 0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, s + dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(s); o.stop(s + dur + 0.05);
+}
+function jingle() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, 0.28, 'triangle')); }
+function winJingle() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.13, 0.4, 'triangle', 0.26)); }
+function speak(text) {
+  if (!soundOn) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = 1.45; u.rate = 1.02;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch (e) { /* speech is a bonus — never break the game */ }
+}
+// theme song slot: file arrives later from Kc; absence must be silent + harmless
+const themeSong = $('themeSong');
+themeSong.addEventListener('error', () => { themeDead = true; $('musicBtn').classList.add('off'); }, true);
+function tryTheme() {
+  if (!musicOn || themeDead) return;
+  try { const p = themeSong.play(); if (p) p.catch(() => { /* not there yet — fine */ }); } catch (e) { /* fine */ }
+}
+$('musicBtn').addEventListener('click', () => {
+  musicOn = !musicOn;
+  $('musicBtn').classList.toggle('off', !musicOn);
+  try { if (musicOn) tryTheme(); else themeSong.pause(); } catch (e) { /* fine */ }
+});
+$('soundBtn').addEventListener('click', () => {
+  soundOn = !soundOn;
+  $('soundBtn').classList.toggle('off', !soundOn);
+  if (!soundOn) { try { speechSynthesis.cancel(); } catch (e) { /* fine */ } }
+});
+
+// ---------- three.js scene ----------
+const stage = $('stage'), sceneEl = $('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (e) {
+  $('nogl').style.display = 'block';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+sceneEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fd8ff);
+scene.fog = new THREE.Fog(0x9fd8ff, 40, 85);
+
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
+camera.position.set(0, 8, 10);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a4a, 0.95));
+const sun = new THREE.DirectionalLight(0xfff2cc, 1.6);
+sun.position.set(14, 22, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -24; sun.shadow.camera.right = 24;
+sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+fill.position.set(-10, 12, -14);
+scene.add(fill);
+
+// ---------- materials / mesh helpers ----------
+const mat = (c, rough = 0.65, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, ...extra });
+const colliders = []; // {x1,z1,x2,z2}
+const wallColliders = []; // walls only — the camera respects these, but flies over low furniture
+function addCollider(cx, cz, hw, hd) { colliders.push({ x1: cx - hw, x2: cx + hw, z1: cz - hd, z2: cz + hd }); }
+function box(w, h, d, color, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, opts.rough ?? 0.7, opts.extra || {}));
+  m.position.set(x, y, z);
+  if (opts.ry) m.rotation.y = opts.ry;
+  m.castShadow = !!opts.shadow; m.receiveShadow = true;
+  scene.add(m);
+  if (opts.collide) addCollider(x, z, w / 2, d / 2);
+  if (opts.wall) wallColliders.push({ x1: x - w / 2, x2: x + w / 2, z1: z - d / 2, z2: z + d / 2 });
+  return m;
+}
+function cyl(rt, rb, h, color, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 20), mat(color, opts.rough ?? 0.6));
+  m.position.set(x, y, z);
+  m.castShadow = !!opts.shadow; m.receiveShadow = true;
+  scene.add(m);
+  if (opts.collide) addCollider(x, z, Math.max(rt, rb), Math.max(rt, rb));
+  return m;
+}
+function sph(r, color, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 22, 18), mat(color, opts.rough ?? 0.55, opts.extra || {}));
+  m.position.set(x, y, z);
+  if (opts.sy || opts.sx || opts.sz) m.scale.set(opts.sx || 1, opts.sy || 1, opts.sz || 1);
+  m.castShadow = !!opts.shadow; m.receiveShadow = true;
+  (opts.parent || scene).add(m);
+  return m;
+}
+
+// ---------- the house: 3x3 rooms, door gaps in every dividing wall ----------
+const RW = 12, RD = 10, WALL_H = 3, WT = 0.4;         // room width/depth, wall height/thickness
+const COLX = [-12, 0, 12], ROWZ = [-10, 0, 10];      // room centers
+const WALL_COLOR = 0xf3e2c7;
+
+// floors + room-name sprites
+function textSprite(text) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(255,255,255,0.85)';
+  g.beginPath(); g.roundRect(56, 18, 400, 92, 46); g.fill();
+  g.fillStyle = '#5b2a86'; g.font = '800 52px system-ui, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 256, 66);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+  sp.scale.set(4.6, 1.15, 1);
+  return sp;
+}
+for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+  const i = r * 3 + c, cx = COLX[c], cz = ROWZ[r];
+  const f = new THREE.Mesh(new THREE.PlaneGeometry(RW, RD), mat(FLOOR_COLORS[i], 0.9));
+  f.rotation.x = -Math.PI / 2; f.position.set(cx, 0, cz);
+  f.receiveShadow = true;
+  scene.add(f);
+  const label = textSprite(ROOM_NAMES[i]);
+  label.position.set(cx, WALL_H + 0.75, cz);
+  scene.add(label);
+  // a soft round rug in most rooms
+  if (i !== 2 && i !== 5) {
+    const rug = new THREE.Mesh(new THREE.CircleGeometry(2.1, 28), mat(0xffffff, 1, { transparent: true, opacity: 0.35 }));
+    rug.rotation.x = -Math.PI / 2; rug.position.set(cx, 0.02, cz);
+    rug.receiveShadow = true;
+    scene.add(rug);
+  }
+}
+// outside ground (grass apron so edges look nice)
+const lawn = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), mat(0x8ed081, 1));
+lawn.rotation.x = -Math.PI / 2; lawn.position.y = -0.05;
+lawn.receiveShadow = true;
+scene.add(lawn);
+
+// walls — outer
+box(36 + WT * 2, WALL_H, WT, WALL_COLOR, 0, WALL_H / 2, -15 - WT / 2, { collide: true, wall: true });
+box(36 + WT * 2, WALL_H, WT, WALL_COLOR, 0, WALL_H / 2, 15 + WT / 2, { collide: true, wall: true });
+box(WT, WALL_H, 30, WALL_COLOR, -18 - WT / 2, WALL_H / 2, 0, { collide: true, wall: true });
+box(WT, WALL_H, 30, WALL_COLOR, 18 + WT / 2, WALL_H / 2, 0, { collide: true, wall: true });
+// walls — vertical dividers (x = -6, +6) with a door gap at each row center
+for (const dx of [-6, 6]) for (const zc of ROWZ) {
+  box(WT, WALL_H, 3.7, WALL_COLOR, dx, WALL_H / 2, zc - 3.15, { collide: true, wall: true });
+  box(WT, WALL_H, 3.7, WALL_COLOR, dx, WALL_H / 2, zc + 3.15, { collide: true, wall: true });
+}
+// walls — horizontal dividers (z = -5, +5) with a door gap at each column center
+for (const dz of [-5, 5]) for (const xc of COLX) {
+  box(3.7, WALL_H, WT, WALL_COLOR, xc - 3.15, WALL_H / 2, dz, { collide: true, wall: true });
+  box(3.7, WALL_H, WT, WALL_COLOR, xc + 3.15, WALL_H / 2, dz, { collide: true, wall: true });
+}
+// NOTE: horizontal segments use width 5.0 centered ±3.15 → they span to the room edge and meet the vertical walls.
+
+// ---------- furniture (simple, friendly, solid) ----------
+function bed(x, z, blanket) {
+  box(3.4, 0.7, 2.2, 0xa9744f, x, 0.35, z, { collide: true, shadow: true });
+  box(3.0, 0.28, 1.9, blanket, x + 0.15, 0.82, z, {});
+  box(0.9, 0.3, 1.6, 0xffffff, x - 1.1, 0.85, z, {});
+  box(0.25, 1.5, 2.2, 0x8a5a34, x - 1.85, 0.75, z, {});
+}
+function shelf(x, z, ry = 0) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 0.5), mat(0x9c6b46));
+  frame.position.y = 1.3; frame.castShadow = true; g.add(frame);
+  const bookCols = [0xff5d8f, 0x4dc3ff, 0xffd93d, 0x7be495, 0xb98cff, 0xff7a59];
+  for (let s = 0; s < 3; s++) for (let b = 0; b < 4; b++) {
+    const bk = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.55, 0.3), mat(bookCols[(s * 4 + b) % 6]));
+    bk.position.set(-0.9 + b * 0.55, 0.55 + s * 0.8, 0.3); g.add(bk);
+  }
+  addCollider(x, z, 1.3, 0.45);
+}
+function sofa(x, z) {
+  box(4.4, 0.9, 1.7, 0xff8fab, x, 0.45, z, { collide: true, shadow: true });
+  box(4.4, 1.1, 0.45, 0xff7aa5, x, 1.0, z - 0.65, {});
+  box(0.5, 0.6, 1.7, 0xff7aa5, x - 2.0, 0.85, z, {});
+  box(0.5, 0.6, 1.7, 0xff7aa5, x + 2.0, 0.85, z, {});
+}
+function plant(x, z) {
+  cyl(0.34, 0.26, 0.55, 0xd2691e, x, 0.28, z, { collide: true });
+  const fol = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 1), mat(0x3f9e4d, 0.9));
+  fol.position.set(x, 1.05, z); fol.castShadow = true; scene.add(fol);
+  sph(0.09, 0xff5d8f, x + 0.3, 1.25, z + 0.2, {});
+  sph(0.09, 0xffd93d, x - 0.28, 1.35, z - 0.15, {});
+}
+
+// Jurnie's Room (top-left)
+bed(-15.5, -13.2, 0xff8fab);
+box(2.2, 1.1, 0.9, 0xb98cff, -8.6, 0.55, -14.2, { collide: true });          // dresser
+// Leah's Room (top-middle)
+bed(-2.5, -13.2, 0x4dc3ff);
+shelf(4.6, -14.4);
+// Kitchen (top-right)
+box(7.5, 1.05, 1.1, 0xf7f7f7, 14.6, 0.53, -14.3, { collide: true });        // counter
+box(1.5, 2.3, 1.2, 0xdfe9f5, 8.6, 1.15, -14.2, { collide: true, shadow: true }); // fridge
+box(2.6, 0.18, 2.6, 0xa9744f, 12, 0.95, -9.5, { collide: true });           // table top
+cyl(0.18, 0.18, 0.9, 0x8a5a34, 12, 0.45, -9.5, {});
+// Living Room (middle-left)
+sofa(-12, -3.4);
+box(3.2, 0.5, 1.0, 0x8a5a34, -12, 0.25, 3.6, { collide: true });            // TV stand
+box(2.8, 1.6, 0.12, 0x22242e, -12, 1.45, 3.6, { extra: { emissive: 0x224466, emissiveIntensity: 0.7 } }); // TV
+box(2.0, 0.35, 1.1, 0xffd93d, -12, 0.18, 0.4, { collide: true });           // coffee table
+// Play Room (center)
+box(2.4, 1.0, 1.2, 0x7be495, 3.8, 0.5, -3.9, { collide: true });            // toy box
+box(0.8, 0.8, 0.8, 0xff5d8f, -2.5, 0.4, 3.4, { collide: true });
+box(0.8, 0.8, 0.8, 0x4dc3ff, -1.6, 0.4, 3.9, { collide: true });
+box(0.8, 0.8, 0.8, 0xffd93d, -2.1, 1.2, 3.65, {});
+// Bathroom (middle-right)
+box(3.4, 0.85, 1.7, 0xffffff, 15.8, 0.43, -3.6, { collide: true });         // tub
+box(3.0, 0.15, 1.3, 0x9be7ff, 15.8, 0.9, -3.6, {});
+box(1.4, 0.95, 0.9, 0xd8f7f0, 8.8, 0.48, -4.2, { collide: true });          // sink
+// Story Corner (bottom-left)
+shelf(-16.9, 8.0, Math.PI / 2);
+sofa(-12, 13.8);
+box(4.4, 1.1, 0.45, 0xff7aa5, -12, 1.0, 14.45, {});
+// Garden Room (bottom-middle)
+plant(-4.8, 6.2); plant(4.8, 6.2); plant(-4.8, 13.8); plant(4.8, 13.8);
+box(4.6, 0.5, 1.4, 0xa9744f, 0, 0.25, 10, { collide: true });               // planter bench
+// Toy Room (bottom-right)
+shelf(16.9, 12.0, -Math.PI / 2);
+box(2.6, 1.0, 1.2, 0xffb340, 8.6, 0.5, 14.0, { collide: true });            // toy chest
+
+// ---------- characters ----------
+function makeGirl(dress, hair, skin) {
+  const g = new THREE.Group();
+  const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.52, 0.8, 20), mat(dress, 0.6)), 0, 0.55, 0); // dress
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 20), mat(skin, 0.55)), 0, 1.28, 0);          // head
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.355, 24, 20), mat(hair, 0.85)), 0, 1.36, -0.045);    // hair cap
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 14), mat(hair, 0.85)), -0.26, 1.56, 0);       // bun L
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 14), mat(hair, 0.85)), 0.26, 1.56, 0);        // bun R
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), mat(0x222222, 0.4)), -0.12, 1.30, 0.315); // eyes
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), mat(0x222222, 0.4)), 0.12, 1.30, 0.315);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mat(0xff8fab, 0.6)), -0.2, 1.2, 0.29);     // cheeks
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mat(0xff8fab, 0.6)), 0.2, 1.2, 0.29);
+  const armL = add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 10), mat(skin, 0.55)), -0.42, 0.82, 0);
+  const armR = add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 10), mat(skin, 0.55)), 0.42, 0.82, 0);
+  armL.rotation.z = 0.45; armR.rotation.z = -0.45;
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.26), mat(0xd6336c, 0.5)), -0.16, 0.05, 0.05); // shoes
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.26), mat(0xd6336c, 0.5)), 0.16, 0.05, 0.05);
+  g.userData.arms = [armL, armR];
+  scene.add(g);
+  return g;
+}
+const jurnie = makeGirl(0xff6fb5, 0x3a2314, 0x8d5524);
+const J_RAD = 0.45;
+const jPos = new THREE.Vector3(-13.5, 0, 0.8);   // Living Room, open floor — NOT inside the sofa (v2 bug)
+jurnie.position.copy(jPos);
+let heading = Math.PI;                          // facing the camera at start
+jurnie.rotation.y = heading;
+
+const leah = makeGirl(0x4dc3ff, 0x14100d, 0xf2c79b);
+leah.position.set(1.5, 0, -8.5);
+leah.rotation.y = Math.PI * 0.9;
+
+// Fancy the cat
+const fancy = new THREE.Group();
+{
+  const white = 0xf7f3ee, grey = 0x9aa3ad;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 14), mat(white, 0.8));
+  body.scale.set(1, 0.78, 1.3); body.position.y = 0.3; body.castShadow = true; fancy.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 18, 14), mat(white, 0.8));
+  head.position.set(0, 0.5, 0.34); head.castShadow = true; fancy.add(head);
+  for (const sx of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.16, 10), mat(grey, 0.8));
+    ear.position.set(sx * 0.12, 0.7, 0.32); fancy.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), mat(0x222222, 0.4));
+    eye.position.set(sx * 0.08, 0.53, 0.53); fancy.add(eye);
+  }
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), mat(0xff8fab, 0.5));
+  nose.position.set(0, 0.47, 0.55); fancy.add(nose);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 0.55, 8), mat(grey, 0.8));
+  tail.position.set(0, 0.5, -0.42); tail.rotation.x = -0.7; fancy.add(tail);
+  const spot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), mat(grey, 0.85));
+  spot.scale.set(1, 0.5, 1); spot.position.set(0.12, 0.5, -0.05); fancy.add(spot);
+}
+fancy.position.set(-9, 0, 1);
+scene.add(fancy);
+const fancySpots = [new THREE.Vector3(-9, 0, 1), new THREE.Vector3(-15, 0, 1.5), new THREE.Vector3(-13, 0, -1), new THREE.Vector3(-9.5, 0, 3)];
+let fancyTarget = 0, fancyWait = 0;
+
+// ---------- collectible meshes ----------
+function starGeo(points = 5, outer = 0.46, inner = 0.23, depth = 0.22) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 ? inner : outer, a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const px = Math.cos(a) * r, py = Math.sin(a) * r;
+    i ? s.lineTo(px, py) : s.moveTo(px, py);
+  }
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04 });
+  g.translate(0, 0, -depth / 2);
+  return g;
+}
+function heartGeo() {
+  const s = new THREE.Shape();
+  s.moveTo(0, -0.38);
+  s.bezierCurveTo(-0.55, 0.02, -0.34, 0.42, 0, 0.2);
+  s.bezierCurveTo(0.34, 0.42, 0.55, 0.02, 0, -0.38);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.22, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04 });
+  g.translate(0, 0, -0.11);
+  return g;
+}
+function squishyMesh(kind, color) {
+  const g = new THREE.Group();
+  const m = mat(color, 0.45, { emissive: color, emissiveIntensity: 0.22 });
+  const addM = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
+  if (kind === 'star') addM(new THREE.Mesh(starGeo(), m), 0, 0.5, 0);
+  else if (kind === 'heart') addM(new THREE.Mesh(heartGeo(), m), 0, 0.5, 0);
+  else if (kind === 'bear') {
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 14), m), 0, 0.3, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.21, 18, 14), m), 0, 0.66, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), m), -0.17, 0.85, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), m), 0.17, 0.85, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), mat(0xfff1e6, 0.6)), 0, 0.6, 0.17);
+  } else if (kind === 'cloud') {
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 14), m), 0, 0.34, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), m), -0.27, 0.27, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), m), 0.27, 0.27, 0);
+    g.children.forEach(ch => ch.scale.y = 0.82);
+  } else { // bunny
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), m), 0, 0.28, 0);
+    addM(new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 14), m), 0, 0.62, 0);
+    for (const sx of [-1, 1]) {
+      const ear = addM(new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.26, 4, 10), m), sx * 0.1, 0.92, 0);
+      ear.rotation.z = sx * -0.15;
+    }
+  }
+  return g;
+}
+function needohMesh(color) {
+  const g = new THREE.Group();
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.38, 22, 18),
+    mat(color, 0.22, { emissive: color, emissiveIntensity: 0.28 }));
+  ball.scale.y = 0.72; ball.position.y = 0.3; ball.castShadow = true;
+  g.add(ball);
+  const shine = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), mat(0xffffff, 0.15, { transparent: true, opacity: 0.75 }));
+  shine.position.set(-0.13, 0.48, 0.24); g.add(shine);
+  return g;
+}
+const items = [];
+function placeItem(def, isNeedoh) {
+  const g = isNeedoh ? needohMesh(def.color) : squishyMesh(def.kind, def.color);
+  g.position.set(def.x, 0.1, def.z);
+  scene.add(g);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.52, 0.68, 28),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(def.x, 0.04, def.z);
+  scene.add(ring);
+  items.push({ ...def, isNeedoh, group: g, ring, found: false, phase: Math.random() * Math.PI * 2 });
+}
+SQUISHIES.forEach(d => placeItem(d, false));
+NEEDOHS.forEach(d => placeItem(d, true));
+
+// ---------- collision (with v2's unstick rule) ----------
+function overlaps(x, z, r) {
+  for (const c of colliders) if (x + r > c.x1 && x - r < c.x2 && z + r > c.z1 && z - r < c.z2) return true;
+  return false;
+}
+function tryMove(dx, dz) {
+  if (overlaps(jPos.x, jPos.z, J_RAD)) {          // already overlapping: let her walk out
+    jPos.x = clamp(jPos.x + dx, -17.4, 17.4);
+    jPos.z = clamp(jPos.z + dz, -14.4, 14.4);
+    return;
+  }
+  if (!overlaps(jPos.x + dx, jPos.z, J_RAD)) jPos.x += dx;
+  if (!overlaps(jPos.x, jPos.z + dz, J_RAD)) jPos.z += dz;
+  jPos.x = clamp(jPos.x, -17.4, 17.4);
+  jPos.z = clamp(jPos.z, -14.4, 14.4);
+}
+
+// ---------- confetti (2D overlay canvas) ----------
+const cCanvas = $('confetti'), cCtx = cCanvas.getContext('2d');
+let confetti = [];
+function sizeConfetti() { cCanvas.width = stage.clientWidth; cCanvas.height = stage.clientHeight; }
+const CONF_COLORS = ['#ff5d8f', '#ffd93d', '#4dc3ff', '#7be495', '#b98cff', '#ff7a59', '#ffffff'];
+function burst(n = 90, cx = null, cy = null) {
+  const W = cCanvas.width, H = cCanvas.height;
+  const ox = cx ?? W / 2, oy = cy ?? H / 2;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 8;
+    confetti.push({
+      x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 4,
+      w: 5 + Math.random() * 6, h: 8 + Math.random() * 8,
+      rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+      color: CONF_COLORS[i % CONF_COLORS.length], life: 90 + Math.random() * 50
+    });
+  }
+}
+function drawConfetti() {
+  cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+  confetti = confetti.filter(p => p.life > 0 && p.y < cCanvas.height + 30);
+  for (const p of confetti) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.22; p.vx *= 0.985; p.rot += p.vr; p.life--;
+    cCtx.save(); cCtx.translate(p.x, p.y); cCtx.rotate(p.rot);
+    cCtx.globalAlpha = Math.min(1, p.life / 40);
+    cCtx.fillStyle = p.color; cCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cCtx.restore();
+  }
+}
+
+// ---------- game state / find celebration ----------
+let started = false, won = false, popLockUntil = 0;
+let sqFound = 0, ndFound = 0;
+function updateCounts() {
+  $('sqCount').textContent = sqFound + '/10';
+  $('ndCount').textContent = ndFound + '/8';
+  $('findCount').textContent = 'Squishies ' + sqFound + '/10 ⭐ NeeDohs ' + ndFound + '/8';
+}
+let popTimer = null;
+function celebrate(item) {
+  item.found = true;
+  scene.remove(item.group); scene.remove(item.ring);
+  if (item.isNeedoh) ndFound++; else sqFound++;
+  updateCounts();
+  $('findEmoji').textContent = item.emoji;
+  $('findText').textContent = item.isNeedoh
+    ? 'Jurnie found the ' + item.name + '!'
+    : 'Jurnie found the ' + item.name + '!';
+  $('findPop').classList.add('show');
+  popLockUntil = performance.now() + 2400;
+  burst(110);
+  if (sqFound + ndFound >= 18) { winGame(); return; }
+  jingle();
+  speak('Hey Jurnie, you found me! I\'m the ' + item.name + '!');
+  clearTimeout(popTimer);
+  popTimer = setTimeout(() => $('findPop').classList.remove('show'), 3000);
+}
+$('findPop').addEventListener('click', () => $('findPop').classList.remove('show'));
+function winGame() {
+  won = true;
+  setTimeout(() => {
+    $('findPop').classList.remove('show');
+    $('winScreen').classList.add('show');
+    winJingle();
+    speak('Congratulations, Jurnie! You found them all! You are a Super Explorer!');
+    burst(180); setTimeout(() => burst(140), 350); setTimeout(() => burst(140), 750);
+  }, 2600);
+}
+$('againBtn').addEventListener('click', () => location.reload());
+$('playBtn').addEventListener('click', () => {
+  started = true;
+  $('startScreen').style.display = 'none';
+  ac(); tryTheme();
+  speak('Hi Jurnie! Let\'s find the squishies and NeeDohs!');
+});
+
+// room toast
+let curRoom = -1, toastTimer = null;
+function roomCheck() {
+  const c = clamp(Math.floor((jPos.x + 18) / RW), 0, 2);
+  const r = clamp(Math.floor((jPos.z + 15) / RD), 0, 2);
+  const i = r * 3 + c;
+  if (i !== curRoom) {
+    curRoom = i;
+    const t = $('roomToast');
+    t.textContent = ROOM_NAMES[i];
+    t.style.opacity = 1;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.style.opacity = 0, 1600);
+  }
+}
+
+// ---------- input: keys + joystick ----------
+const keys = {};
+addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.startsWith('Arrow')) e.preventDefault(); });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+const joy = { active: false, x: 0, y: 0, id: null };
+const stick = $('stick'), knob = $('knob');
+function stickSet(dx, dy) {
+  const max = 40, len = Math.hypot(dx, dy) || 1, cl = Math.min(len, max);
+  const nx = dx / len * cl, ny = dy / len * cl;
+  knob.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
+  joy.x = nx / max; joy.y = ny / max;
+}
+stick.addEventListener('pointerdown', e => { joy.active = true; joy.id = e.pointerId; stick.setPointerCapture(e.pointerId); const r = stick.getBoundingClientRect(); stickSet(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)); });
+stick.addEventListener('pointermove', e => { if (joy.active && e.pointerId === joy.id) { const r = stick.getBoundingClientRect(); stickSet(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)); } });
+const stickEnd = e => { if (e.pointerId === joy.id) { joy.active = false; joy.x = 0; joy.y = 0; knob.style.transform = 'translate(-50%,-50%)'; } };
+stick.addEventListener('pointerup', stickEnd);
+stick.addEventListener('pointercancel', stickEnd);
+
+// ---------- resize ----------
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  sizeConfetti();
+}
+addEventListener('resize', resize);
+
+// ---------- main loop ----------
+const clock = new THREE.Clock();
+let walkCycle = 0;
+const camTarget = new THREE.Vector3();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // --- movement (camera-relative), frozen during the find pop-up's first moments ---
+  let ix = 0, iy = 0;
+  if (keys['arrowup'] || keys['w']) iy -= 1;
+  if (keys['arrowdown'] || keys['s']) iy += 1;
+  if (keys['arrowleft'] || keys['a']) ix -= 1;
+  if (keys['arrowright'] || keys['d']) ix += 1;
+  if (joy.active) { ix += joy.x; iy += joy.y; }
+  const mag = Math.hypot(ix, iy);
+  const canMove = started && !won && performance.now() > popLockUntil - 1400; // brief pause, then free
+  if (mag > 0.15 && canMove) {
+    ix /= Math.max(1, mag); iy /= Math.max(1, mag);
+    // camera forward on the ground
+    const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).negate();
+    const dir = new THREE.Vector3().addScaledVector(fwd, -iy).addScaledVector(right, -ix);
+    if (dir.lengthSq() > 0.001) {
+      dir.normalize();
+      const speed = 6;
+      tryMove(dir.x * speed * dt, dir.z * speed * dt);
+      heading = angLerp(heading, Math.atan2(dir.x, dir.z), 1 - Math.pow(0.0001, dt));
+      walkCycle += dt * 11;
+    }
+  } else {
+    walkCycle = 0;
+  }
+  jurnie.position.set(jPos.x, Math.abs(Math.sin(walkCycle)) * 0.07, jPos.z);
+  jurnie.rotation.y = heading;
+  const arms = jurnie.userData.arms;
+  if (arms) { const s = Math.sin(walkCycle) * 0.5; arms[0].rotation.x = s; arms[1].rotation.x = -s; }
+
+  // --- camera: behind + above Jurnie, smoothed, with wall pull-in ---
+  const back = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+  camTarget.copy(jPos).addScaledVector(back, -5.2).add(new THREE.Vector3(0, 4.3, 0));
+  camTarget.x = clamp(camTarget.x, -21, 21);
+  camTarget.z = clamp(camTarget.z, -19, 21);
+  // walk the camera spot from Jurnie outward; stop before any wall/furniture
+  // so the camera never sits behind a wall with Jurnie hidden (indoor rule)
+  const camBase = new THREE.Vector3(jPos.x, 1.3, jPos.z);
+  const camSpot = camTarget.clone();
+  const steps = 22;
+  const hitsWall = (x, z, r) => wallColliders.some(c => x + r > c.x1 && x - r < c.x2 && z + r > c.z1 && z - r < c.z2);
+  for (let s = 1; s <= steps; s++) {
+    const p = camBase.clone().lerp(camTarget, s / steps);
+    if (hitsWall(p.x, p.z, 0.3)) {
+      camSpot.copy(camBase).lerp(camTarget, Math.max(0.22, (s - 1) / steps));
+      break;
+    }
+    camSpot.copy(p);
+  }
+  camera.position.lerp(camSpot, 1 - Math.pow(0.001, dt));
+  camera.lookAt(jPos.x, 1.1, jPos.z);
+
+  // --- friends ---
+  leah.position.y = Math.sin(t * 1.6) * 0.04;
+  leah.rotation.y = Math.PI * 0.9 + Math.sin(t * 0.7) * 0.15;
+  if (fancyWait > 0) { fancyWait -= dt; }
+  else {
+    const target = fancySpots[fancyTarget];
+    const d = new THREE.Vector3().subVectors(target, fancy.position); d.y = 0;
+    if (d.length() < 0.15) { fancyTarget = (fancyTarget + 1) % fancySpots.length; fancyWait = 1.5 + Math.random() * 2; }
+    else {
+      d.normalize();
+      fancy.position.addScaledVector(d, dt * 1.1);
+      fancy.rotation.y = angLerp(fancy.rotation.y, Math.atan2(d.x, d.z), 0.12);
+    }
+  }
+  fancy.position.y = Math.abs(Math.sin(t * 5)) * 0.015;
+
+  // --- collectibles: bob, spin, sparkle, collect ---
+  if (started && !won) {
+    for (const item of items) {
+      if (item.found) continue;
+      item.group.position.y = 0.12 + Math.sin(t * 2.2 + item.phase) * 0.1;
+      item.group.rotation.y += dt * 1.4;
+      item.ring.material.opacity = 0.28 + Math.sin(t * 3 + item.phase) * 0.14;
+      const dx = jPos.x - item.group.position.x, dz = jPos.z - item.group.position.z;
+      if (dx * dx + dz * dz < 1.05) celebrate(item);
+    }
+  }
+  roomCheck();
+  drawConfetti();
+  renderer.render(scene, camera);
+}
+resize();
+updateCounts();
+animate();
+// test hook: lets a headless check confirm the scene booted
+window.__jurniego = { scene, camera, renderer, items, version: 'v3' };
+</script>
+</body>
+</html>
