@@ -270,6 +270,7 @@ function collide(px, py, r) {
   return false;
 }
 function moveActor(a, dx, dy, r) {
+  if (collide(a.x, a.y, r)) { a.x += dx; a.y += dy; return; } // already overlapping: let them walk out
   if (!collide(a.x + dx, a.y, r)) a.x += dx;
   if (!collide(a.x, a.y + dy, r)) a.y += dy;
 }
@@ -738,7 +739,7 @@ function drawButterfly(b, t) {
 }
 
 // actors
-const jurnie = { x: 160, y: 340, face: 1, moving: false, waving: false,
+const jurnie = { x: 170, y: 398, face: 1, moving: false, waving: false,
   skin: '#f2c29b', skinDark: '#dfa878', hair: '#4a2c1a', dress: '#ff6fae', dressDark: '#e7549c', bow: '#ffd93d' };
 const leah = { x: 420, y: 120, face: -1, moving: false, waving: false, longHair: true,
   skin: '#f7cfae', skinDark: '#e8b98d', hair: '#2e1c10', dress: '#9d7bff', dressDark: '#7f5fe0', bow: '#ff8fab' };
